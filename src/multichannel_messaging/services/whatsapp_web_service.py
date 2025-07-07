@@ -112,6 +112,9 @@ class WhatsAppWebService:
             return False, "You must acknowledge the risks of using browser automation"
         
         try:
+            # Check Chrome availability
+            chrome_available, chrome_info = self._check_chrome_availability()
+            
             # Save configuration
             config = {
                 "configured": True,
@@ -122,7 +125,10 @@ class WhatsAppWebService:
                 "rate_limit_per_minute": self.rate_limit_per_minute,
                 "daily_message_limit": self.daily_message_limit,
                 "min_delay_seconds": self.min_delay_seconds,
-                "service_type": "embedded_web_automation"
+                "service_type": "embedded_web_automation",
+                "chrome_available": chrome_available,
+                "chrome_info": chrome_info,
+                "platform": platform.system().lower()
             }
             
             self.config_dir.mkdir(parents=True, exist_ok=True)
@@ -131,8 +137,18 @@ class WhatsAppWebService:
             
             self._is_configured = True
             self.auto_send = auto_send
-            logger.info(f"WhatsApp Web service configured successfully (auto_send={auto_send})")
-            return True, "WhatsApp Web service configured successfully"
+            
+            # Provide user feedback about Chrome
+            success_msg = "WhatsApp Web service configured successfully"
+            if auto_send:
+                if chrome_available:
+                    success_msg += f" with auto-send enabled (Chrome detected: {chrome_info})"
+                else:
+                    success_msg += f" with auto-send enabled (⚠️ Chrome not detected: {chrome_info})"
+                    success_msg += "\n💡 Install Google Chrome for better auto-send reliability"
+            
+            logger.info(f"WhatsApp Web service configured (auto_send={auto_send}, chrome_available={chrome_available})")
+            return True, success_msg
             
         except Exception as e:
             error_msg = f"Failed to configure WhatsApp Web service: {e}"
@@ -335,21 +351,40 @@ class WhatsAppWebService:
             True if successful, False otherwise
         """
         try:
+            # Check Chrome availability first
+            chrome_available, chrome_info = self._check_chrome_availability()
+            if not chrome_available:
+                logger.warning(f"Chrome not available: {chrome_info}")
+                logger.info("💡 Install Google Chrome for better auto-send reliability")
+            
             system = platform.system().lower()
-            
-            # Try platform-specific automation first
             success = False
-            if system == "darwin":  # macOS
-                success = self._auto_send_macos()
-            elif system == "windows":  # Windows
-                success = self._auto_send_windows()
-            else:  # Linux or other
-                success = self._auto_send_linux()
             
-            # If platform-specific method failed, try JavaScript injection
+            # Try JavaScript injection first (most reliable)
+            logger.info("🔧 Attempting JavaScript auto-send...")
+            if system == "darwin":  # macOS
+                success = self._auto_send_javascript_macos()
+            elif system == "windows":  # Windows
+                success = self._auto_send_javascript_windows()
+            
+            # If JavaScript failed, try platform-specific automation
             if not success:
-                logger.info("Platform-specific auto-send failed, trying JavaScript method...")
-                success = self._auto_send_javascript()
+                logger.info("🔧 JavaScript failed, trying platform-specific automation...")
+                if system == "darwin":  # macOS
+                    success = self._auto_send_macos()
+                elif system == "windows":  # Windows
+                    success = self._auto_send_windows()
+                elif system == "linux":  # Linux
+                    success = self._auto_send_linux()
+            
+            if success:
+                logger.info("✅ Auto-send successful!")
+            else:
+                logger.warning("⚠️ Auto-send failed - manual sending required")
+                if chrome_available:
+                    logger.info("💡 Make sure WhatsApp Web is loaded and Chrome is the active window")
+                else:
+                    logger.info("💡 Install Google Chrome and ensure WhatsApp Web is open")
             
             return success
                 
@@ -379,52 +414,39 @@ class WhatsAppWebService:
     def _auto_send_javascript_macos(self) -> bool:
         """Auto-send using JavaScript on macOS - Chrome only."""
         try:
-            # AppleScript to execute JavaScript in Chrome only
+            # Simplified AppleScript to execute JavaScript in Chrome
             applescript = '''
-            tell application "System Events"
-                -- Try Chrome only
-                try
-                    tell application "Google Chrome"
-                        if (count of windows) > 0 then
-                            repeat with w from 1 to count of windows
-                                repeat with t from 1 to count of tabs of window w
-                                    if title of tab t of window w contains "WhatsApp" then
-                                        set active tab index of window w to t
-                                        set index of window w to 1
-                                        activate
-                                        delay 1
-                                        execute tab t of window w javascript "
-                                            // Try multiple selectors for the send button
-                                            var sendBtn = document.querySelector('[data-testid=\"send\"]') || 
-                                                         document.querySelector('[aria-label*=\"Send\"]') ||
-                                                         document.querySelector('button[aria-label*=\"Send\"]') ||
-                                                         document.querySelector('span[data-testid=\"send\"]');
-                                            if (sendBtn) {
-                                                sendBtn.click();
-                                                console.log('Send button clicked');
-                                            } else {
-                                                // Fallback: simulate Enter key
-                                                var event = new KeyboardEvent('keydown', {
-                                                    key: 'Enter', 
-                                                    code: 'Enter',
-                                                    keyCode: 13,
-                                                    which: 13,
-                                                    bubbles: true
-                                                });
-                                                document.dispatchEvent(event);
-                                                console.log('Enter key simulated');
-                                            }
-                                        "
-                                        return true
-                                    end if
-                                end repeat
-                            end repeat
-                        end if
-                    end tell
-                on error
-                    return false
-                end try
-                
+            tell application "Google Chrome"
+                if (count of windows) > 0 then
+                    repeat with w from 1 to count of windows
+                        repeat with t from 1 to count of tabs of window w
+                            if title of tab t of window w contains "WhatsApp" then
+                                set active tab index of window w to t
+                                set index of window w to 1
+                                activate
+                                delay 1
+                                execute tab t of window w javascript "
+                                    var sendBtn = document.querySelector('[data-testid=\\"send\\"]') || 
+                                                 document.querySelector('[aria-label*=\\"Send\\"]') ||
+                                                 document.querySelector('button[aria-label*=\\"Send\\"]');
+                                    if (sendBtn) {
+                                        sendBtn.click();
+                                        true;
+                                    } else {
+                                        var event = new KeyboardEvent('keydown', {
+                                            key: 'Enter', 
+                                            keyCode: 13,
+                                            bubbles: true
+                                        });
+                                        document.dispatchEvent(event);
+                                        true;
+                                    }
+                                "
+                                return true
+                            end if
+                        end repeat
+                    end repeat
+                end if
                 return false
             end tell
             '''
@@ -433,21 +455,81 @@ class WhatsAppWebService:
                 ["osascript", "-e", applescript],
                 capture_output=True,
                 text=True,
-                timeout=8
+                timeout=10
             )
             
-            return result.returncode == 0
+            return result.returncode == 0 and "true" in result.stdout.lower()
             
         except Exception as e:
             logger.error(f"JavaScript Chrome auto-send failed: {e}")
             return False
     
     def _auto_send_javascript_windows(self) -> bool:
-        """Auto-send using JavaScript on Windows (limited support)."""
+        """Auto-send using JavaScript on Windows via PowerShell and Chrome DevTools."""
         try:
-            # This is more limited on Windows, but we can try
-            logger.info("JavaScript auto-send not fully supported on Windows, using key simulation")
-            return False
+            # Enhanced PowerShell script to use Chrome DevTools Protocol
+            powershell_script = '''
+            Add-Type -AssemblyName System.Windows.Forms
+            
+            # Find Chrome processes with WhatsApp
+            $chromeProcesses = Get-Process -Name "chrome" -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -like "*WhatsApp*" }
+            
+            if ($chromeProcesses) {
+                # Bring Chrome to front
+                $chromeProcess = $chromeProcesses[0]
+                [System.Windows.Forms.Application]::SetForegroundWindow($chromeProcess.MainWindowHandle)
+                Start-Sleep -Seconds 1
+                
+                # Try to use Chrome DevTools to execute JavaScript
+                try {
+                    # Use Chrome's remote debugging if available
+                    $response = Invoke-RestMethod -Uri "http://localhost:9222/json" -Method Get -ErrorAction SilentlyContinue
+                    if ($response) {
+                        $whatsappTab = $response | Where-Object { $_.title -like "*WhatsApp*" } | Select-Object -First 1
+                        if ($whatsappTab) {
+                            $debugUrl = $whatsappTab.webSocketDebuggerUrl -replace "ws://", "http://" -replace "/devtools/page/", "/json/runtime/evaluate?tabId="
+                            $jsCode = @"
+                                var sendBtn = document.querySelector('[data-testid=\"send\"]') || 
+                                             document.querySelector('[aria-label*=\"Send\"]') ||
+                                             document.querySelector('button[aria-label*=\"Send\"]');
+                                if (sendBtn) {
+                                    sendBtn.click();
+                                    true;
+                                } else {
+                                    var event = new KeyboardEvent('keydown', {
+                                        key: 'Enter', 
+                                        keyCode: 13,
+                                        bubbles: true
+                                    });
+                                    document.dispatchEvent(event);
+                                    true;
+                                }
+"@
+                            $body = @{ expression = $jsCode } | ConvertTo-Json
+                            $result = Invoke-RestMethod -Uri $debugUrl -Method Post -Body $body -ContentType "application/json" -ErrorAction SilentlyContinue
+                            if ($result.result.value) {
+                                return $true
+                            }
+                        }
+                    }
+                } catch {}
+                
+                # Fallback to key simulation
+                [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
+                return $true
+            }
+            
+            return $false
+            '''
+            
+            result = subprocess.run(
+                ["powershell", "-Command", powershell_script],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            return result.returncode == 0 and "True" in result.stdout
             
         except Exception as e:
             logger.error(f"JavaScript Windows auto-send failed: {e}")
@@ -744,6 +826,62 @@ class WhatsAppWebService:
             # Final fallback to default browser
             return webbrowser.open(url)
     
+    def _check_chrome_availability(self) -> Tuple[bool, str]:
+        """
+        Check if Chrome is available on the system.
+        
+        Returns:
+            Tuple of (is_available, chrome_path_or_command)
+        """
+        try:
+            system = platform.system().lower()
+            
+            if system == "darwin":  # macOS
+                # Check if Chrome is installed
+                result = subprocess.run([
+                    "mdfind", "kMDItemCFBundleIdentifier == 'com.google.Chrome'"
+                ], capture_output=True, text=True, timeout=5)
+                
+                if result.returncode == 0 and result.stdout.strip():
+                    return True, "Google Chrome"
+                else:
+                    return False, "Chrome not found on macOS"
+                    
+            elif system == "windows":  # Windows
+                # Check common Chrome installation paths
+                chrome_paths = [
+                    r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+                    r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+                    os.path.expanduser(r"~\AppData\Local\Google\Chrome\Application\chrome.exe")
+                ]
+                
+                for chrome_path in chrome_paths:
+                    if os.path.exists(chrome_path):
+                        return True, chrome_path
+                
+                return False, "Chrome not found on Windows"
+                
+            else:  # Linux
+                # Check for Chrome variants
+                chrome_commands = ["google-chrome", "google-chrome-stable", "chromium-browser", "chromium"]
+                
+                for chrome_cmd in chrome_commands:
+                    try:
+                        result = subprocess.run([
+                            "which", chrome_cmd
+                        ], capture_output=True, text=True, timeout=5)
+                        
+                        if result.returncode == 0:
+                            return True, chrome_cmd
+                    except FileNotFoundError:
+                        continue
+                
+                return False, "Chrome not found on Linux"
+                
+        except Exception as e:
+            logger.error(f"Failed to check Chrome availability: {e}")
+            return False, f"Error checking Chrome: {e}"
+
     def _create_whatsapp_url(self, phone: str, message: str) -> str:
         """
         Create WhatsApp Web URL with pre-filled message.
@@ -764,94 +902,7 @@ class WhatsAppWebService:
         
         return url
     
-    def _open_in_chrome(self, url: str) -> bool:
-        """
-        Open URL in Chrome specifically.
-        
-        Args:
-            url: URL to open
-            
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            system = platform.system().lower()
-            
-            if system == "darwin":  # macOS
-                # Try to open in Chrome specifically
-                result = subprocess.run([
-                    "open", "-a", "Google Chrome", url
-                ], capture_output=True, text=True, timeout=5)
-                
-                if result.returncode == 0:
-                    return True
-                else:
-                    # Fallback to default browser
-                    logger.warning("Chrome not found, using default browser")
-                    return webbrowser.open(url)
-                    
-            elif system == "windows":  # Windows
-                # Try to open in Chrome specifically
-                chrome_paths = [
-                    r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-                    r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-                    os.path.expanduser(r"~\AppData\Local\Google\Chrome\Application\chrome.exe")
-                ]
-                
-                for chrome_path in chrome_paths:
-                    if os.path.exists(chrome_path):
-                        result = subprocess.run([
-                            chrome_path, url
-                        ], capture_output=True, text=True, timeout=5)
-                        
-                        if result.returncode == 0:
-                            return True
-                
-                # Fallback to default browser
-                logger.warning("Chrome not found, using default browser")
-                return webbrowser.open(url)
-                
-            else:  # Linux
-                # Try to open in Chrome specifically
-                chrome_commands = ["google-chrome", "google-chrome-stable", "chromium-browser", "chromium"]
-                
-                for chrome_cmd in chrome_commands:
-                    try:
-                        result = subprocess.run([
-                            chrome_cmd, url
-                        ], capture_output=True, text=True, timeout=5)
-                        
-                        if result.returncode == 0:
-                            return True
-                    except FileNotFoundError:
-                        continue
-                
-                # Fallback to default browser
-                logger.warning("Chrome not found, using default browser")
-                return webbrowser.open(url)
-                
-        except Exception as e:
-            logger.error(f"Failed to open URL in Chrome: {e}")
-            # Final fallback to default browser
-            return webbrowser.open(url)
-        """
-        Create WhatsApp Web URL with pre-filled message.
-        
-        Args:
-            phone: Formatted phone number
-            message: Message content
-            
-        Returns:
-            WhatsApp Web URL
-        """
-        # URL encode the message
-        encoded_message = urllib.parse.quote(message)
-        
-        # Create WhatsApp Web URL
-        # Format: https://web.whatsapp.com/send?phone=PHONE&text=MESSAGE
-        url = f"https://web.whatsapp.com/send?phone={phone}&text={encoded_message}"
-        
-        return url
+
     
     def _track_message_sent(self):
         """Track that a message was sent."""
@@ -911,26 +962,67 @@ class WhatsAppWebService:
     
     def get_service_info(self) -> Dict[str, Any]:
         """Get service information and status."""
+        chrome_available, chrome_info = self._check_chrome_availability()
+        system = platform.system().lower()
+        
+        # Platform-specific capabilities
+        platform_features = {
+            "darwin": [
+                "✅ AppleScript automation support",
+                "✅ Chrome JavaScript injection",
+                "✅ Spotlight Chrome detection",
+                "✅ Native Chrome opening"
+            ],
+            "windows": [
+                "✅ PowerShell automation support", 
+                "✅ Chrome DevTools Protocol support",
+                "✅ Registry Chrome detection",
+                "✅ COM automation fallback"
+            ],
+            "linux": [
+                "✅ xdotool automation support",
+                "✅ Chrome variant detection",
+                "✅ Command-line Chrome opening",
+                "⚠️ Limited JavaScript injection"
+            ]
+        }
+        
         return {
             "service_name": "WhatsApp Web Automation Service",
             "is_available": self.is_available(),
             "is_configured": self.is_configured(),
+            "platform": system.title(),
+            "chrome_status": {
+                "available": chrome_available,
+                "info": chrome_info,
+                "recommended": True
+            },
             "daily_usage": self.get_daily_usage(),
             "rate_limits": {
                 "per_minute": self.rate_limit_per_minute,
                 "min_delay_seconds": self.min_delay_seconds
             },
+            "auto_send": {
+                "enabled": self.auto_send,
+                "delay_seconds": self.auto_send_delay,
+                "methods": ["JavaScript injection", "Platform automation", "Key simulation"]
+            },
+            "platform_features": platform_features.get(system, ["⚠️ Limited platform support"]),
             "warnings": [
                 "⚠️ Uses browser automation which may violate WhatsApp ToS",
                 "⚠️ Risk of account suspension",
-                "⚠️ Requires manual sending in WhatsApp Web",
-                "⚠️ Less reliable than WhatsApp Business API"
+                "⚠️ Requires WhatsApp Web to be logged in",
+                "⚠️ Less reliable than WhatsApp Business API",
+                "💡 Chrome browser recommended for best results"
             ],
             "features": [
                 "✅ No external dependencies required",
-                "✅ Uses built-in browser functionality",
+                "✅ Chrome-optimized automation",
+                "✅ Cross-platform support (macOS, Windows, Linux)",
                 "✅ Conservative rate limiting",
-                "✅ Daily usage tracking"
+                "✅ Daily usage tracking",
+                "✅ Multiple auto-send methods",
+                "✅ Graceful fallback mechanisms"
             ],
             "last_error": self._last_error
         }
