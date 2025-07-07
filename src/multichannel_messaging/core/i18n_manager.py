@@ -4,6 +4,7 @@ Handles multi-language support for English, Portuguese, and Spanish.
 """
 
 import os
+import sys
 import json
 from typing import Dict, Optional, List
 from pathlib import Path
@@ -40,7 +41,16 @@ class I18nManager:
         
         # Paths
         self.config_dir = get_config_dir()
-        self.translations_dir = Path(__file__).parent.parent / "localization"
+        
+        # Handle PyInstaller bundle path resolution
+        if getattr(sys, 'frozen', False):
+            # Running in PyInstaller bundle
+            bundle_dir = Path(sys._MEIPASS)
+            self.translations_dir = bundle_dir / "multichannel_messaging" / "localization"
+        else:
+            # Running in development
+            self.translations_dir = Path(__file__).parent.parent / "localization"
+            
         self.config_file = self.config_dir / "language_config.json"
         
         # Load translations and configuration
@@ -52,22 +62,32 @@ class I18nManager:
     def _load_translations(self):
         """Load all translation files."""
         try:
-            # Ensure translations directory exists
-            self.translations_dir.mkdir(exist_ok=True)
+            logger.info(f"Loading translations from: {self.translations_dir}")
+            logger.info(f"Translations directory exists: {self.translations_dir.exists()}")
+            
+            # Ensure translations directory exists (only in development)
+            if not getattr(sys, 'frozen', False):
+                self.translations_dir.mkdir(exist_ok=True)
             
             # Load translations for each supported language
             for lang_code in self.SUPPORTED_LANGUAGES.keys():
                 translation_file = self.translations_dir / f"{lang_code}.json"
+                logger.info(f"Looking for translation file: {translation_file}")
                 
                 if translation_file.exists():
                     with open(translation_file, 'r', encoding='utf-8') as f:
                         self.translations[lang_code] = json.load(f)
-                    logger.info(f"Loaded translations for {lang_code}")
+                    logger.info(f"Loaded translations for {lang_code}: {len(self.translations[lang_code])} keys")
                 else:
-                    # Create empty translation file
-                    self.translations[lang_code] = {}
-                    self._save_translation_file(lang_code)
-                    logger.info(f"Created empty translation file for {lang_code}")
+                    logger.warning(f"Translation file not found: {translation_file}")
+                    # Create empty translation file (only in development)
+                    if not getattr(sys, 'frozen', False):
+                        self.translations[lang_code] = {}
+                        self._save_translation_file(lang_code)
+                        logger.info(f"Created empty translation file for {lang_code}")
+                    else:
+                        # In bundle, use empty translations
+                        self.translations[lang_code] = {}
             
             # Ensure base English translations exist
             self._ensure_base_translations()

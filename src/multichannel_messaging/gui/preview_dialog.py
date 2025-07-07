@@ -62,14 +62,17 @@ class PreviewDialog(QDialog):
             font = QFont("Courier New", 10)
         self.preview_text.setFont(font)
         
-        # Style the preview area
+        # Style the preview area with explicit text color
         self.preview_text.setStyleSheet("""
             QTextEdit {
-                background-color: #f8f9fa;
+                background-color: #ffffff;
+                color: #2c3e50;
                 border: 1px solid #dee2e6;
                 border-radius: 5px;
                 padding: 10px;
                 line-height: 1.4;
+                selection-background-color: #3498db;
+                selection-color: #ffffff;
             }
         """)
         
