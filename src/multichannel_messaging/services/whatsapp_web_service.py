@@ -378,6 +378,10 @@ class WhatsAppWebService:
                         success = self._auto_send_macos_simple()
                 elif system == "windows":  # Windows
                     success = self._auto_send_windows()
+                    # If mouse click method failed, try simple Enter key method
+                    if not success:
+                        logger.info("🔧 Mouse click method failed, trying simple Enter key...")
+                        success = self._auto_send_windows_simple()
                 elif system == "linux":  # Linux
                     success = self._auto_send_linux()
             
@@ -855,6 +859,60 @@ class WhatsAppWebService:
             return False
         except Exception as e:
             logger.error(f"Windows auto-send failed: {e}")
+            return False
+    
+    def _auto_send_windows_simple(self) -> bool:
+        """Simple Windows auto-send using just Enter key after focusing Chrome."""
+        try:
+            # Simple PowerShell script that just focuses Chrome and sends Enter
+            powershell_script = '''
+            Add-Type -AssemblyName System.Windows.Forms
+            
+            # Find Chrome processes
+            $chromeProcesses = Get-Process -Name "chrome" -ErrorAction SilentlyContinue
+            
+            if ($chromeProcesses) {
+                # Try to bring any Chrome window to front
+                foreach ($proc in $chromeProcesses) {
+                    try {
+                        if ($proc.MainWindowHandle -ne 0) {
+                            [System.Windows.Forms.Application]::SetForegroundWindow($proc.MainWindowHandle)
+                            Start-Sleep -Seconds 1
+                            
+                            # Send Enter key
+                            [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
+                            Start-Sleep -Milliseconds 200
+                            
+                            # Backup: try Ctrl+Enter
+                            [System.Windows.Forms.SendKeys]::SendWait("^{ENTER}")
+                            
+                            return $true
+                        }
+                    } catch {}
+                }
+            }
+            
+            return $false
+            '''
+            
+            result = subprocess.run(
+                ["powershell", "-Command", powershell_script],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            success = result.returncode == 0 and "True" in result.stdout
+            
+            if success:
+                logger.info("✅ Windows simple Enter auto-send successful")
+            else:
+                logger.debug(f"Windows simple auto-send failed: {result.stdout} | {result.stderr}")
+            
+            return success
+            
+        except Exception as e:
+            logger.debug(f"Simple Windows auto-send failed: {e}")
             return False
 
     
