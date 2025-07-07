@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QPushButton, QLabel, QTextEdit, QListWidget, QListWidgetItem,
     QGroupBox, QProgressBar, QStatusBar, QMenuBar, QFileDialog,
-    QMessageBox, QSplitter, QFrame, QCheckBox, QComboBox
+    QMessageBox, QSplitter, QFrame, QCheckBox, QComboBox, QDialog
 )
 from PySide6.QtCore import Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QAction, QFont, QIcon
@@ -19,6 +19,8 @@ from ..core.config_manager import ConfigManager
 from ..core.csv_processor import CSVProcessor
 from ..core.models import Customer, MessageTemplate, MessageChannel
 from ..services.email_service import EmailService
+from ..services.whatsapp_local_service import LocalWhatsAppBusinessService
+from ..gui.whatsapp_settings_dialog import WhatsAppSettingsDialog
 from ..utils.logger import get_logger
 from ..utils.exceptions import CSVProcessingError, OutlookIntegrationError
 
@@ -88,6 +90,7 @@ class MainWindow(QMainWindow):
         self.config_manager = config_manager
         self.csv_processor = CSVProcessor()
         self.email_service = None
+        self.whatsapp_service = LocalWhatsAppBusinessService()  # Add WhatsApp service
         self.customers: List[Customer] = []
         self.current_template: Optional[MessageTemplate] = None
         self.sending_thread: Optional[EmailSendingThread] = None
@@ -153,6 +156,16 @@ class MainWindow(QMainWindow):
         test_outlook_action.triggered.connect(self.test_outlook_connection)
         tools_menu.addAction(test_outlook_action)
         
+        tools_menu.addSeparator()
+        
+        whatsapp_settings_action = QAction("WhatsApp Settings...", self)
+        whatsapp_settings_action.triggered.connect(self.show_whatsapp_settings)
+        tools_menu.addAction(whatsapp_settings_action)
+        
+        test_whatsapp_action = QAction("Test WhatsApp Connection", self)
+        test_whatsapp_action.triggered.connect(self.test_whatsapp_connection)
+        tools_menu.addAction(test_whatsapp_action)
+        
         # Help menu
         help_menu = menubar.addMenu("Help")
         
@@ -168,8 +181,18 @@ class MainWindow(QMainWindow):
         self.import_btn.clicked.connect(self.import_csv)
         toolbar_layout.addWidget(self.import_btn)
         
-        self.send_btn = QPushButton("Send Emails")
-        self.send_btn.clicked.connect(self.send_emails)
+        # Channel selection
+        toolbar_layout.addWidget(QLabel("Send via:"))
+        self.channel_combo = QComboBox()
+        self.channel_combo.addItems(["Email Only", "WhatsApp Only", "Both Channels"])
+        self.channel_combo.setCurrentText("Email Only")  # Default to email for backward compatibility
+        self.channel_combo.currentTextChanged.connect(self.on_channel_changed)
+        toolbar_layout.addWidget(self.channel_combo)
+        
+        toolbar_layout.addWidget(QFrame())  # Separator
+        
+        self.send_btn = QPushButton("Send Messages")
+        self.send_btn.clicked.connect(self.send_messages)
         self.send_btn.setEnabled(False)
         toolbar_layout.addWidget(self.send_btn)
         
@@ -244,33 +267,56 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(panel)
         
         # Template section
-        template_group = QGroupBox("Email Template")
+        template_group = QGroupBox("Message Template")
         template_layout = QVBoxLayout(template_group)
         
         # Template selector (placeholder for now)
         template_selector_layout = QHBoxLayout()
         template_selector_layout.addWidget(QLabel("Template:"))
         self.template_combo = QComboBox()
-        self.template_combo.addItem("Default Welcome Email")
+        self.template_combo.addItem("Default Welcome Message")
         template_selector_layout.addWidget(self.template_combo)
         
         # Add preview button
-        self.preview_btn = QPushButton("Preview Email")
-        self.preview_btn.clicked.connect(self.preview_email)
+        self.preview_btn = QPushButton("Preview Message")
+        self.preview_btn.clicked.connect(self.preview_message)
         template_selector_layout.addWidget(self.preview_btn)
         
         template_layout.addLayout(template_selector_layout)
         
-        # Subject field
-        template_layout.addWidget(QLabel("Subject:"))
+        # Email fields
+        email_group = QGroupBox("Email Content")
+        email_layout = QVBoxLayout(email_group)
+        
+        email_layout.addWidget(QLabel("Subject:"))
         self.subject_edit = QTextEdit()
         self.subject_edit.setMaximumHeight(60)
-        template_layout.addWidget(self.subject_edit)
+        email_layout.addWidget(self.subject_edit)
         
-        # Content field
-        template_layout.addWidget(QLabel("Content:"))
+        email_layout.addWidget(QLabel("Email Content:"))
         self.content_edit = QTextEdit()
-        template_layout.addWidget(self.content_edit)
+        self.content_edit.setMaximumHeight(200)
+        email_layout.addWidget(self.content_edit)
+        
+        template_layout.addWidget(email_group)
+        
+        # WhatsApp fields
+        whatsapp_group = QGroupBox("WhatsApp Content")
+        whatsapp_layout = QVBoxLayout(whatsapp_group)
+        
+        whatsapp_layout.addWidget(QLabel("WhatsApp Message:"))
+        self.whatsapp_content_edit = QTextEdit()
+        self.whatsapp_content_edit.setMaximumHeight(150)
+        self.whatsapp_content_edit.setPlaceholderText("Enter WhatsApp message content (leave empty to use email content)")
+        whatsapp_layout.addWidget(self.whatsapp_content_edit)
+        
+        # Character count for WhatsApp
+        self.whatsapp_char_label = QLabel("Characters: 0/4096")
+        self.whatsapp_char_label.setStyleSheet("color: gray;")
+        self.whatsapp_content_edit.textChanged.connect(self.update_whatsapp_char_count)
+        whatsapp_layout.addWidget(self.whatsapp_char_label)
+        
+        template_layout.addWidget(whatsapp_group)
         
         layout.addWidget(template_group)
         
@@ -300,6 +346,12 @@ class MainWindow(QMainWindow):
         self.setStatusBar(self.status_bar)
         
         # Add permanent widgets to status bar
+        self.email_status_label = QLabel("Email: Ready")
+        self.status_bar.addPermanentWidget(self.email_status_label)
+        
+        self.whatsapp_status_label = QLabel("WhatsApp: Not configured")
+        self.status_bar.addPermanentWidget(self.whatsapp_status_label)
+        
         self.quota_label = QLabel("Quota: 0/100")
         self.status_bar.addPermanentWidget(self.quota_label)
     
@@ -335,25 +387,24 @@ class MainWindow(QMainWindow):
         try:
             self.email_service = EmailService()
             platform_info = self.email_service.get_platform_info()
-            self.outlook_status_label.setText(f"Outlook: Connected ({platform_info})")
-            self.outlook_status_label.setStyleSheet("color: green;")
             logger.info(f"Email service initialized successfully for {platform_info}")
         except Exception as e:
-            self.outlook_status_label.setText("Outlook: Error")
-            self.outlook_status_label.setStyleSheet("color: red;")
             logger.error(f"Failed to initialize email service: {e}")
             QMessageBox.warning(
                 self, 
                 "Outlook Connection Error", 
                 f"Failed to connect to Outlook:\n{e}\n\nPlease ensure Microsoft Outlook is installed and try again."
             )
+        
+        # Update status display
+        self.update_status_display()
     
     def load_default_template(self):
-        """Load default email template."""
+        """Load default multi-channel template."""
         self.current_template = MessageTemplate(
             id="default_welcome",
-            name="Default Welcome Email",
-            channel=MessageChannel.EMAIL,
+            name="Default Welcome Message",
+            channels=["email", "whatsapp"],
             subject="Welcome to our service, {name}!",
             content="""Dear {name},
 
@@ -363,11 +414,21 @@ If you have any questions, please don't hesitate to contact us.
 
 Best regards,
 The Team""",
+            whatsapp_content="""Hello {name}! 👋
+
+Thank you for your interest in our services. We're excited to have {company} join our community!
+
+Feel free to reach out if you have any questions.
+
+Best regards,
+The Team""",
             variables=["name", "company"]
         )
         
         self.subject_edit.setPlainText(self.current_template.subject)
         self.content_edit.setPlainText(self.current_template.content)
+        self.whatsapp_content_edit.setPlainText(self.current_template.whatsapp_content)
+        self.update_whatsapp_char_count()
     
     def import_csv(self):
         """Import CSV file with customer data."""
@@ -510,42 +571,10 @@ The Team""",
         self.update_recipients_info()
     
     def send_emails(self):
-        """Start sending emails."""
-        if not self.email_service:
-            QMessageBox.warning(self, "Service Error", "Email service is not available.")
-            return
-        
-        selected_customers = self.get_selected_customers()
-        if not selected_customers:
-            QMessageBox.information(self, "No Recipients", "Please select at least one recipient.")
-            return
-        
-        # Update template with current content
-        self.current_template.subject = self.subject_edit.toPlainText()
-        self.current_template.content = self.content_edit.toPlainText()
-        
-        # Confirm sending
-        reply = QMessageBox.question(
-            self,
-            "Confirm Sending",
-            f"Send emails to {len(selected_customers)} recipients?",
-            QMessageBox.Yes | QMessageBox.No
-        )
-        
-        if reply != QMessageBox.Yes:
-            return
-        
-        # Start sending in background thread
-        self.sending_thread = EmailSendingThread(selected_customers, self.current_template, self.email_service)
-        self.sending_thread.progress_updated.connect(self.update_progress)
-        self.sending_thread.email_sent.connect(self.on_email_sent)
-        self.sending_thread.finished.connect(self.on_sending_finished)
-        
-        self.sending_thread.start()
-        
-        # Update UI state
-        self.send_btn.setEnabled(False)
-        self.draft_btn.setEnabled(False)
+        """Start sending emails - backward compatibility method."""
+        # Set channel to email only and call new method
+        self.channel_combo.setCurrentText("Email Only")
+        self.send_messages()
         self.stop_btn.setEnabled(True)
         self.progress_bar.setMaximum(len(selected_customers))
         self.progress_bar.setValue(0)
@@ -586,38 +615,12 @@ The Team""",
         self.update_send_button_state()
     
     def preview_email(self):
-        """Preview email with sample customer data."""
-        if not self.customers:
-            # Use sample customer data for preview
-            sample_customer = Customer(
-                name="John Doe",
-                company="Example Corp",
-                phone="+1-555-0123",
-                email="john.doe@example.com"
-            )
-        else:
-            # Use first customer from the list
-            sample_customer = self.customers[0]
-        
-        # Update template with current content
-        self.current_template.subject = self.subject_edit.toPlainText()
-        self.current_template.content = self.content_edit.toPlainText()
-        
-        # Render template
-        rendered = self.current_template.render(sample_customer)
-        subject = rendered.get('subject', '')
-        content = rendered.get('content', '')
-        
-        # Create a custom dialog for better control over styling
-        from PySide6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton, QLabel
-        
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Email Preview")
-        dialog.setMinimumSize(600, 400)
-        
-        layout = QVBoxLayout(dialog)
-        
-        # Subject section
+        """Preview email - backward compatibility method."""
+        # Set channel to email and call new preview method
+        original_channel = self.channel_combo.currentText()
+        self.channel_combo.setCurrentText("Email Only")
+        self.preview_message()
+        self.channel_combo.setCurrentText(original_channel)
         subject_label = QLabel("Subject:")
         subject_label.setStyleSheet("font-weight: bold; margin-top: 10px;")
         layout.addWidget(subject_label)
@@ -718,6 +721,259 @@ CSC-Reach streamlines business communication processes with professional email t
 
 © 2024 CSC-Reach Team"""
         )
+    
+    # New multi-channel methods
+    def update_whatsapp_char_count(self):
+        """Update WhatsApp character count display."""
+        content = self.whatsapp_content_edit.toPlainText()
+        char_count = len(content)
+        self.whatsapp_char_label.setText(f"Characters: {char_count}/4096")
+        
+        if char_count > 4096:
+            self.whatsapp_char_label.setStyleSheet("color: red;")
+        elif char_count > 3500:
+            self.whatsapp_char_label.setStyleSheet("color: orange;")
+        else:
+            self.whatsapp_char_label.setStyleSheet("color: gray;")
+    
+    def on_channel_changed(self, channel_text: str):
+        """Handle channel selection change."""
+        self.update_send_button_text()
+        self.update_status_display()
+    
+    def update_send_button_text(self):
+        """Update send button text based on selected channel."""
+        channel = self.channel_combo.currentText()
+        if channel == "Email Only":
+            self.send_btn.setText("Send Emails")
+        elif channel == "WhatsApp Only":
+            self.send_btn.setText("Send WhatsApp")
+        else:
+            self.send_btn.setText("Send Messages")
+    
+    def update_status_display(self):
+        """Update status bar based on service availability."""
+        # Update email status
+        if self.email_service:
+            self.email_status_label.setText("Email: Ready")
+            self.email_status_label.setStyleSheet("color: green;")
+        else:
+            self.email_status_label.setText("Email: Not ready")
+            self.email_status_label.setStyleSheet("color: red;")
+        
+        # Update WhatsApp status
+        if self.whatsapp_service.is_configured():
+            self.whatsapp_status_label.setText("WhatsApp: Ready")
+            self.whatsapp_status_label.setStyleSheet("color: green;")
+        else:
+            self.whatsapp_status_label.setText("WhatsApp: Not configured")
+            self.whatsapp_status_label.setStyleSheet("color: orange;")
+    
+    def show_whatsapp_settings(self):
+        """Show WhatsApp settings dialog."""
+        dialog = WhatsAppSettingsDialog(self)
+        if dialog.exec() == QDialog.Accepted:
+            # Refresh WhatsApp service
+            self.whatsapp_service = LocalWhatsAppBusinessService()
+            self.update_status_display()
+            
+            if self.whatsapp_service.is_configured():
+                QMessageBox.information(
+                    self,
+                    "WhatsApp Configured",
+                    "WhatsApp Business API has been configured successfully!"
+                )
+    
+    def test_whatsapp_connection(self):
+        """Test WhatsApp connection."""
+        if not self.whatsapp_service.is_configured():
+            QMessageBox.warning(
+                self, 
+                "WhatsApp Not Configured", 
+                "Please configure WhatsApp settings first.\n\nGo to Tools → WhatsApp Settings to set up your credentials."
+            )
+            return
+        
+        try:
+            success, message = self.whatsapp_service.test_connection()
+            if success:
+                QMessageBox.information(self, "WhatsApp Connection Test", f"✅ {message}")
+                self.whatsapp_status_label.setText("WhatsApp: Connected")
+                self.whatsapp_status_label.setStyleSheet("color: green;")
+            else:
+                QMessageBox.warning(self, "WhatsApp Connection Test", f"❌ {message}")
+                self.whatsapp_status_label.setText("WhatsApp: Connection failed")
+                self.whatsapp_status_label.setStyleSheet("color: red;")
+        except Exception as e:
+            QMessageBox.critical(self, "WhatsApp Connection Test", f"Test failed: {e}")
+    
+    def preview_message(self):
+        """Preview message for selected channel(s)."""
+        if not self.customers:
+            QMessageBox.warning(self, "No Recipients", "Please import a CSV file first.")
+            return
+        
+        # Use first customer for preview
+        customer = self.customers[0]
+        
+        # Update current template with UI content
+        self.update_current_template()
+        
+        # Generate preview content
+        rendered = self.current_template.render(customer)
+        
+        channel = self.channel_combo.currentText()
+        preview_text = ""
+        
+        if channel in ["Email Only", "Both Channels"]:
+            preview_text += "📧 EMAIL PREVIEW:\n"
+            preview_text += f"To: {customer.email}\n"
+            preview_text += f"Subject: {rendered.get('subject', '')}\n\n"
+            preview_text += rendered.get('content', '')
+            preview_text += "\n" + "="*50 + "\n\n"
+        
+        if channel in ["WhatsApp Only", "Both Channels"]:
+            preview_text += "📱 WHATSAPP PREVIEW:\n"
+            preview_text += f"To: {customer.phone}\n\n"
+            whatsapp_content = rendered.get('whatsapp_content', rendered.get('content', ''))
+            preview_text += whatsapp_content
+        
+        # Show preview dialog
+        dialog = QMessageBox(self)
+        dialog.setWindowTitle("Message Preview")
+        dialog.setText(f"Preview for: {customer.name} ({customer.company})")
+        dialog.setDetailedText(preview_text)
+        dialog.setStandardButtons(QMessageBox.Ok)
+        dialog.exec()
+    
+    def update_current_template(self):
+        """Update current template with UI content."""
+        if self.current_template:
+            self.current_template.subject = self.subject_edit.toPlainText()
+            self.current_template.content = self.content_edit.toPlainText()
+            self.current_template.whatsapp_content = self.whatsapp_content_edit.toPlainText()
+    
+    def send_messages(self):
+        """Send messages via selected channel(s) - replaces send_emails."""
+        selected_customers = self.get_selected_customers()
+        if not selected_customers:
+            QMessageBox.warning(self, "No Recipients", "Please select at least one recipient.")
+            return
+        
+        channel = self.channel_combo.currentText()
+        
+        # Validate channel availability
+        if channel in ["Email Only", "Both Channels"] and not self.email_service:
+            QMessageBox.warning(self, "Email Service Error", "Email service is not available.")
+            return
+        
+        if channel in ["WhatsApp Only", "Both Channels"] and not self.whatsapp_service.is_configured():
+            QMessageBox.warning(
+                self, 
+                "WhatsApp Not Configured", 
+                "Please configure WhatsApp settings first.\n\nGo to Tools → WhatsApp Settings."
+            )
+            return
+        
+        # Update template
+        self.update_current_template()
+        
+        # Confirm sending
+        channel_text = channel.lower().replace(" only", "").replace("both channels", "email and WhatsApp")
+        reply = QMessageBox.question(
+            self,
+            "Confirm Sending",
+            f"Send messages to {len(selected_customers)} recipients via {channel_text}?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        
+        if reply != QMessageBox.Yes:
+            return
+        
+        # Start sending
+        self.start_multi_channel_sending(selected_customers, channel)
+    
+    def start_multi_channel_sending(self, customers: List[Customer], channel: str):
+        """Start multi-channel message sending."""
+        # For now, use the existing email thread for email-only
+        # TODO: Create a proper multi-channel sending thread
+        if channel == "Email Only":
+            self.start_email_sending(customers)
+        elif channel == "WhatsApp Only":
+            self.start_whatsapp_sending(customers)
+        else:  # Both channels
+            self.start_both_channels_sending(customers)
+    
+    def start_email_sending(self, customers: List[Customer]):
+        """Start email-only sending (existing functionality)."""
+        if self.sending_thread and self.sending_thread.isRunning():
+            return
+        
+        self.sending_thread = EmailSendingThread(customers, self.current_template, self.email_service)
+        self.sending_thread.progress_updated.connect(self.update_progress)
+        self.sending_thread.email_sent.connect(self.on_email_sent)
+        self.sending_thread.finished.connect(self.on_sending_finished)
+        
+        self.send_btn.setEnabled(False)
+        self.stop_btn.setEnabled(True)
+        self.progress_bar.setMaximum(len(customers))
+        self.progress_bar.setValue(0)
+        
+        self.sending_thread.start()
+    
+    def start_whatsapp_sending(self, customers: List[Customer]):
+        """Start WhatsApp-only sending."""
+        # Simple synchronous sending for now
+        # TODO: Implement proper threaded WhatsApp sending
+        self.send_btn.setEnabled(False)
+        self.progress_bar.setMaximum(len(customers))
+        self.progress_bar.setValue(0)
+        
+        successful = 0
+        failed = 0
+        
+        for i, customer in enumerate(customers):
+            if not customer.phone:
+                self.log_message(f"Skipping {customer.name}: No phone number")
+                failed += 1
+                continue
+            
+            success = self.whatsapp_service.send_message(customer, self.current_template)
+            
+            if success:
+                self.log_message(f"✅ WhatsApp sent to {customer.name} ({customer.phone})")
+                successful += 1
+            else:
+                self.log_message(f"❌ WhatsApp failed to {customer.name} ({customer.phone})")
+                failed += 1
+            
+            self.progress_bar.setValue(i + 1)
+            self.progress_label.setText(f"Sent: {successful}, Failed: {failed}")
+            
+            # Process events to keep UI responsive
+            from PySide6.QtWidgets import QApplication
+            QApplication.processEvents()
+        
+        self.send_btn.setEnabled(True)
+        self.log_message(f"WhatsApp sending completed: {successful} successful, {failed} failed")
+    
+    def start_both_channels_sending(self, customers: List[Customer]):
+        """Start sending via both email and WhatsApp."""
+        # Simple implementation - send email first, then WhatsApp
+        self.log_message("Starting multi-channel sending...")
+        
+        # Filter customers for each channel
+        email_customers = [c for c in customers if c.email]
+        whatsapp_customers = [c for c in customers if c.phone and self.whatsapp_service.is_configured()]
+        
+        self.log_message(f"Email recipients: {len(email_customers)}, WhatsApp recipients: {len(whatsapp_customers)}")
+        
+        # For now, just send WhatsApp (email sending is more complex with threading)
+        if whatsapp_customers:
+            self.start_whatsapp_sending(whatsapp_customers)
+        
+        # TODO: Implement proper multi-channel threaded sending
     
     def closeEvent(self, event):
         """Handle window close event."""
