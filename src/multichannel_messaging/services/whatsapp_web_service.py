@@ -414,7 +414,30 @@ class WhatsAppWebService:
     def _auto_send_javascript_macos(self) -> bool:
         """Auto-send using JavaScript on macOS - Chrome only."""
         try:
-            # Simplified AppleScript to execute JavaScript in Chrome
+            # Simple test to check if JavaScript execution is enabled
+            test_script = '''
+            tell application "Google Chrome"
+                if (count of windows) > 0 then
+                    execute tab 1 of window 1 javascript "true"
+                    return true
+                end if
+                return false
+            end tell
+            '''
+            
+            test_result = subprocess.run(
+                ["osascript", "-e", test_script],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if test_result.returncode != 0 and "JavaScript through AppleScript is turned off" in test_result.stderr:
+                logger.warning("⚠️ Chrome JavaScript execution disabled")
+                logger.info("💡 Enable JavaScript in Chrome: View > Developer > Allow JavaScript from Apple Events")
+                return False
+            
+            # If JavaScript is enabled, try the actual auto-send
             applescript = '''
             tell application "Google Chrome"
                 if (count of windows) > 0 then
@@ -424,25 +447,19 @@ class WhatsAppWebService:
                                 set active tab index of window w to t
                                 set index of window w to 1
                                 activate
-                                delay 1
-                                execute tab t of window w javascript "
-                                    var sendBtn = document.querySelector('[data-testid=\\"send\\"]') || 
-                                                 document.querySelector('[aria-label*=\\"Send\\"]') ||
-                                                 document.querySelector('button[aria-label*=\\"Send\\"]');
-                                    if (sendBtn) {
-                                        sendBtn.click();
-                                        true;
-                                    } else {
-                                        var event = new KeyboardEvent('keydown', {
-                                            key: 'Enter', 
-                                            keyCode: 13,
-                                            bubbles: true
-                                        });
-                                        document.dispatchEvent(event);
-                                        true;
-                                    }
-                                "
-                                return true
+                                delay 2
+                                -- Try to click send button with simple JavaScript
+                                try
+                                    execute tab t of window w javascript "document.querySelector('button[aria-label=\"Send\"]').click()"
+                                    return true
+                                on error
+                                    try
+                                        execute tab t of window w javascript "document.querySelector('button[data-tab][aria-label=\"Send\"]').click()"
+                                        return true
+                                    on error
+                                        return false
+                                    end try
+                                end try
                             end if
                         end repeat
                     end repeat
@@ -455,10 +472,18 @@ class WhatsAppWebService:
                 ["osascript", "-e", applescript],
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=15
             )
             
-            return result.returncode == 0 and "true" in result.stdout.lower()
+            success = result.returncode == 0 and "true" in result.stdout.lower()
+            if success:
+                logger.info("✅ JavaScript auto-send successful")
+            else:
+                logger.warning(f"⚠️ JavaScript auto-send failed")
+                if "JavaScript through AppleScript is turned off" in result.stderr:
+                    logger.info("💡 Enable JavaScript in Chrome: View > Developer > Allow JavaScript from Apple Events")
+            
+            return success
             
         except Exception as e:
             logger.error(f"JavaScript Chrome auto-send failed: {e}")
@@ -489,25 +514,39 @@ class WhatsAppWebService:
                         if ($whatsappTab) {
                             $debugUrl = $whatsappTab.webSocketDebuggerUrl -replace "ws://", "http://" -replace "/devtools/page/", "/json/runtime/evaluate?tabId="
                             $jsCode = @"
-                                var sendBtn = document.querySelector('[data-testid=\"send\"]') || 
-                                             document.querySelector('[aria-label*=\"Send\"]') ||
-                                             document.querySelector('button[aria-label*=\"Send\"]');
+                                // Target the exact WhatsApp send button structure
+                                var sendBtn = document.querySelector('button[aria-label=\"Send\"]') ||
+                                             document.querySelector('button[aria-label*=\"Send\"]') ||
+                                             document.querySelector('button[data-tab][aria-label=\"Send\"]') ||
+                                             document.querySelector('button span[data-icon=\"wds-ic-send-filled\"]').parentElement ||
+                                             document.querySelector('[data-testid=\"send\"]');
+                                
                                 if (sendBtn) {
+                                    console.log('Send button found:', sendBtn);
                                     sendBtn.click();
-                                    true;
+                                    'SUCCESS';
                                 } else {
-                                    var event = new KeyboardEvent('keydown', {
-                                        key: 'Enter', 
-                                        keyCode: 13,
-                                        bubbles: true
-                                    });
-                                    document.dispatchEvent(event);
-                                    true;
+                                    console.log('Send button not found, trying Enter key');
+                                    var messageBox = document.querySelector('[contenteditable=\"true\"]') ||
+                                                    document.querySelector('[data-testid=\"conversation-compose-box-input\"]');
+                                    if (messageBox) {
+                                        messageBox.focus();
+                                        var event = new KeyboardEvent('keydown', {
+                                            key: 'Enter',
+                                            keyCode: 13,
+                                            which: 13,
+                                            bubbles: true
+                                        });
+                                        messageBox.dispatchEvent(event);
+                                        'FALLBACK';
+                                    } else {
+                                        'FAILED';
+                                    }
                                 }
 "@
                             $body = @{ expression = $jsCode } | ConvertTo-Json
                             $result = Invoke-RestMethod -Uri $debugUrl -Method Post -Body $body -ContentType "application/json" -ErrorAction SilentlyContinue
-                            if ($result.result.value) {
+                            if ($result.result.value -eq "SUCCESS" -or $result.result.value -eq "FALLBACK") {
                                 return $true
                             }
                         }
@@ -529,7 +568,13 @@ class WhatsAppWebService:
                 timeout=10
             )
             
-            return result.returncode == 0 and "True" in result.stdout
+            success = result.returncode == 0 and "True" in result.stdout
+            if success:
+                logger.info("✅ Windows JavaScript auto-send successful")
+            else:
+                logger.warning(f"⚠️ Windows JavaScript auto-send failed: {result.stdout}")
+            
+            return success
             
         except Exception as e:
             logger.error(f"JavaScript Windows auto-send failed: {e}")
@@ -538,39 +583,25 @@ class WhatsAppWebService:
     def _auto_send_macos(self) -> bool:
         """Auto-send message on macOS using AppleScript - Chrome only."""
         try:
-            # Simplified AppleScript to target Chrome specifically
+            # Much simpler AppleScript that just sends Enter key to Chrome
             applescript = '''
-            tell application "System Events"
-                delay 1
-                
-                try
-                    tell application "Google Chrome"
-                        if (count of windows) > 0 then
-                            set chromeFound to false
-                            repeat with w from 1 to count of windows
-                                repeat with t from 1 to count of tabs of window w
-                                    if title of tab t of window w contains "WhatsApp" then
-                                        set active tab index of window w to t
-                                        set index of window w to 1
-                                        activate
-                                        set chromeFound to true
-                                        exit repeat
-                                    end if
-                                end repeat
-                                if chromeFound then exit repeat
-                            end repeat
-                            
-                            if chromeFound then
+            tell application "Google Chrome"
+                if (count of windows) > 0 then
+                    repeat with w from 1 to count of windows
+                        repeat with t from 1 to count of tabs of window w
+                            if title of tab t of window w contains "WhatsApp" then
+                                set active tab index of window w to t
+                                set index of window w to 1
+                                activate
                                 delay 1
-                                key code 36
+                                tell application "System Events"
+                                    key code 36 -- Enter key
+                                end tell
                                 return true
                             end if
-                        end if
-                    end tell
-                on error
-                    return false
-                end try
-                
+                        end repeat
+                    end repeat
+                end if
                 return false
             end tell
             '''
@@ -579,20 +610,24 @@ class WhatsAppWebService:
                 ["osascript", "-e", applescript],
                 capture_output=True,
                 text=True,
-                timeout=8
+                timeout=10
             )
             
-            success = result.returncode == 0
-            if not success:
-                logger.warning(f"Chrome auto-send failed: {result.stderr}")
+            success = result.returncode == 0 and "true" in result.stdout.lower()
+            if success:
+                logger.info("✅ macOS auto-send successful")
+            else:
+                logger.warning(f"⚠️ macOS auto-send failed")
+                if result.stderr:
+                    logger.debug(f"AppleScript error: {result.stderr}")
             
             return success
             
         except subprocess.TimeoutExpired:
-            logger.error("Chrome auto-send timed out")
+            logger.error("macOS auto-send timed out")
             return False
         except Exception as e:
-            logger.error(f"Chrome auto-send failed: {e}")
+            logger.error(f"macOS auto-send failed: {e}")
             return False
     
     def _auto_send_windows(self) -> bool:
@@ -826,7 +861,102 @@ class WhatsAppWebService:
             # Final fallback to default browser
             return webbrowser.open(url)
     
+    def _check_chrome_javascript_permissions(self) -> Tuple[bool, str]:
+        """
+        Check if Chrome allows JavaScript execution from AppleScript (macOS only).
+        
+        Returns:
+            Tuple of (is_enabled, message)
+        """
+        try:
+            system = platform.system().lower()
+            if system != "darwin":
+                return True, "JavaScript permissions not applicable on this platform"
+            
+            # Test JavaScript execution in Chrome
+            test_script = '''
+            tell application "Google Chrome"
+                if (count of windows) > 0 then
+                    execute tab 1 of window 1 javascript "true"
+                    return "enabled"
+                else
+                    return "no_windows"
+                end if
+            end tell
+            '''
+            
+            result = subprocess.run(
+                ["osascript", "-e", test_script],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if result.returncode == 0:
+                return True, "JavaScript execution enabled in Chrome"
+            elif "JavaScript through AppleScript is turned off" in result.stderr:
+                return False, "JavaScript execution disabled in Chrome - Enable in View > Developer > Allow JavaScript from Apple Events"
+            else:
+                return False, f"Chrome JavaScript test failed: {result.stderr}"
+                
+        except Exception as e:
+            return False, f"Failed to check Chrome JavaScript permissions: {e}"
+
     def _check_chrome_availability(self) -> Tuple[bool, str]:
+        """
+        Check if Chrome is available on the system.
+        
+        Returns:
+            Tuple of (is_available, chrome_path_or_command)
+        """
+        try:
+            system = platform.system().lower()
+            
+            if system == "darwin":  # macOS
+                # Check if Chrome is installed
+                result = subprocess.run([
+                    "mdfind", "kMDItemCFBundleIdentifier == 'com.google.Chrome'"
+                ], capture_output=True, text=True, timeout=5)
+                
+                if result.returncode == 0 and result.stdout.strip():
+                    return True, "Google Chrome"
+                else:
+                    return False, "Chrome not found on macOS"
+                    
+            elif system == "windows":  # Windows
+                # Check common Chrome installation paths
+                chrome_paths = [
+                    r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+                    r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+                    os.path.expanduser(r"~\AppData\Local\Google\Chrome\Application\chrome.exe")
+                ]
+                
+                for chrome_path in chrome_paths:
+                    if os.path.exists(chrome_path):
+                        return True, chrome_path
+                
+                return False, "Chrome not found on Windows"
+                
+            else:  # Linux
+                # Check for Chrome variants
+                chrome_commands = ["google-chrome", "google-chrome-stable", "chromium-browser", "chromium"]
+                
+                for chrome_cmd in chrome_commands:
+                    try:
+                        result = subprocess.run([
+                            "which", chrome_cmd
+                        ], capture_output=True, text=True, timeout=5)
+                        
+                        if result.returncode == 0:
+                            return True, chrome_cmd
+                    except FileNotFoundError:
+                        continue
+                
+                return False, "Chrome not found on Linux"
+                
+        except Exception as e:
+            logger.error(f"Failed to check Chrome availability: {e}")
+            return False, f"Error checking Chrome: {e}"
         """
         Check if Chrome is available on the system.
         
@@ -963,13 +1093,14 @@ class WhatsAppWebService:
     def get_service_info(self) -> Dict[str, Any]:
         """Get service information and status."""
         chrome_available, chrome_info = self._check_chrome_availability()
+        js_enabled, js_info = self._check_chrome_javascript_permissions()
         system = platform.system().lower()
         
         # Platform-specific capabilities
         platform_features = {
             "darwin": [
                 "✅ AppleScript automation support",
-                "✅ Chrome JavaScript injection",
+                "✅ Chrome JavaScript injection" if js_enabled else "⚠️ Chrome JavaScript injection (disabled)",
                 "✅ Spotlight Chrome detection",
                 "✅ Native Chrome opening"
             ],
@@ -987,6 +1118,18 @@ class WhatsAppWebService:
             ]
         }
         
+        warnings = [
+            "⚠️ Uses browser automation which may violate WhatsApp ToS",
+            "⚠️ Risk of account suspension",
+            "⚠️ Requires WhatsApp Web to be logged in",
+            "⚠️ Less reliable than WhatsApp Business API",
+            "💡 Chrome browser recommended for best results"
+        ]
+        
+        # Add JavaScript-specific warning for macOS
+        if system == "darwin" and not js_enabled:
+            warnings.append("⚠️ Enable Chrome JavaScript: View > Developer > Allow JavaScript from Apple Events")
+        
         return {
             "service_name": "WhatsApp Web Automation Service",
             "is_available": self.is_available(),
@@ -995,6 +1138,8 @@ class WhatsAppWebService:
             "chrome_status": {
                 "available": chrome_available,
                 "info": chrome_info,
+                "javascript_enabled": js_enabled,
+                "javascript_info": js_info,
                 "recommended": True
             },
             "daily_usage": self.get_daily_usage(),
@@ -1008,13 +1153,7 @@ class WhatsAppWebService:
                 "methods": ["JavaScript injection", "Platform automation", "Key simulation"]
             },
             "platform_features": platform_features.get(system, ["⚠️ Limited platform support"]),
-            "warnings": [
-                "⚠️ Uses browser automation which may violate WhatsApp ToS",
-                "⚠️ Risk of account suspension",
-                "⚠️ Requires WhatsApp Web to be logged in",
-                "⚠️ Less reliable than WhatsApp Business API",
-                "💡 Chrome browser recommended for best results"
-            ],
+            "warnings": warnings,
             "features": [
                 "✅ No external dependencies required",
                 "✅ Chrome-optimized automation",
