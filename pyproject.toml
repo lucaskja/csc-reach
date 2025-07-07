@@ -1,0 +1,95 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "multichannel-messaging"
+version = "1.0.0"
+description = "A cross-platform desktop application for bulk messaging through email and WhatsApp"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Multi-Channel Messaging Team", email = "support@multichannelmessaging.com"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Communications :: Email",
+    "Topic :: Office/Business",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "PySide6>=6.5.0",
+    "requests>=2.31.0",
+    "pandas>=2.0.0",
+    "pyyaml>=6.0",
+    "colorlog>=6.7.0",
+    "pywin32>=306; sys_platform == 'win32'",
+    "pyobjc-framework-Cocoa>=9.0; sys_platform == 'darwin'",
+    "pyobjc-framework-ScriptingBridge>=9.0; sys_platform == 'darwin'",
+    "babel>=2.12.0",
+    "python-dateutil>=2.8.0",
+    "cerberus>=1.3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-qt>=4.2.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.5.0",
+    "pyinstaller>=5.13.0",
+]
+
+[project.scripts]
+multichannel-messaging = "multichannel_messaging.main:main"
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = [
+    "win32com.*",
+    "pandas.*",
+    "yaml.*",
+]
+ignore_missing_imports = true

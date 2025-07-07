@@ -1,0 +1,17 @@
+id: "welcome_email"
+name: "Welcome Email"
+channel: "email"
+language: "en"
+subject: "Welcome to our service, {name}!"
+content: |
+  Dear {name},
+  
+  Thank you for your interest in our services. We're excited to have {company} as part of our community.
+  
+  If you have any questions, please don't hesitate to contact us.
+  
+  Best regards,
+  The Team
+variables:
+  - "name"
+  - "company"

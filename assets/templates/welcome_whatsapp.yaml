@@ -1,0 +1,13 @@
+id: "welcome_whatsapp"
+name: "Welcome WhatsApp"
+channel: "whatsapp"
+language: "en"
+content: |
+  Hi {name}! 👋
+  
+  Welcome to our service! We're thrilled to have {company} join us.
+  
+  Feel free to reach out if you need any assistance.
+variables:
+  - "name"
+  - "company"

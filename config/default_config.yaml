@@ -1,0 +1,38 @@
+# Default configuration for Multi-Channel Bulk Messaging System
+app:
+  language: "en"  # en, pt, es
+  theme: "system"  # system, light, dark
+  auto_save: true
+  log_level: "INFO"
+  
+whatsapp:
+  api_key: ""
+  phone_number_id: ""
+  webhook_url: ""
+  api_version: "v17.0"
+  base_url: "https://graph.facebook.com"
+  
+email:
+  outlook_profile: "default"
+  signature_include: true
+  batch_size: 50
+  
+quotas:
+  daily_limit: 100
+  reset_time: "00:00"
+  warning_threshold: 90
+  
+templates:
+  default_email: "welcome_email"
+  default_whatsapp: "welcome_whatsapp"
+  
+ui:
+  window_width: 1200
+  window_height: 800
+  remember_geometry: true
+  
+logging:
+  file_enabled: true
+  console_enabled: true
+  max_file_size: "10MB"
+  backup_count: 5
