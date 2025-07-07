@@ -11,7 +11,8 @@ from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QPushButton, QLabel, QTextEdit, QListWidget, QListWidgetItem,
     QGroupBox, QProgressBar, QStatusBar, QMenuBar, QFileDialog,
-    QMessageBox, QSplitter, QFrame, QCheckBox, QComboBox, QDialog
+    QMessageBox, QSplitter, QFrame, QCheckBox, QComboBox, QDialog,
+    QApplication
 )
 from PySide6.QtCore import Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QAction, QFont, QIcon
@@ -513,7 +514,19 @@ The Team""",
         self.recipients_list.clear()
         
         for customer in self.customers:
-            item = QListWidgetItem(f"{customer.name} ({customer.email})")
+            # Create display text with name, email, and phone
+            display_parts = [customer.name]
+            
+            if customer.email:
+                display_parts.append(f"📧 {customer.email}")
+            
+            if customer.phone:
+                display_parts.append(f"📱 {customer.phone}")
+            
+            # Join parts with " | " separator
+            display_text = " | ".join(display_parts)
+            
+            item = QListWidgetItem(display_text)
             item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
             item.setCheckState(Qt.Checked)
             item.setData(Qt.UserRole, customer)
