@@ -25,6 +25,8 @@ from ..services.whatsapp_local_service import LocalWhatsAppBusinessService
 from ..services.whatsapp_web_service import WhatsAppWebService
 from ..gui.whatsapp_settings_dialog import WhatsAppSettingsDialog
 from ..gui.whatsapp_web_settings_dialog import WhatsAppWebSettingsDialog
+from ..gui.language_settings_dialog import LanguageSettingsDialog
+from ..core.i18n_manager import get_i18n_manager, tr
 from ..utils.logger import get_logger
 from ..utils.exceptions import CSVProcessingError, OutlookIntegrationError
 
@@ -100,6 +102,9 @@ class MainWindow(QMainWindow):
         self.current_template: Optional[MessageTemplate] = None
         self.sending_thread: Optional[EmailSendingThread] = None
         
+        # Initialize i18n manager
+        self.i18n_manager = get_i18n_manager()
+        
         self.setup_ui()
         self.setup_services()
         self.load_default_template()
@@ -110,7 +115,7 @@ class MainWindow(QMainWindow):
     
     def setup_ui(self):
         """Set up the user interface."""
-        self.setWindowTitle("CSC-Reach - Email Communication Platform")
+        self.setWindowTitle(tr("app_title"))
         self.setMinimumSize(1000, 700)
         
         # Set window icon
@@ -851,6 +856,19 @@ CSC-Reach streamlines business communication processes with professional email t
                     "WhatsApp Business API is the recommended approach.\n\n"
                     "You will need to manually send each message in your browser."
                 )
+    
+    def show_language_settings(self):
+        """Show language settings dialog."""
+        dialog = LanguageSettingsDialog(self)
+        dialog.language_changed.connect(self.on_language_changed)
+        dialog.exec()
+    
+    def on_language_changed(self, language_code: str):
+        """Handle language change."""
+        logger.info(f"Language changed to: {language_code}")
+        # Note: Full UI refresh would require application restart
+        # For now, just update the window title
+        self.setWindowTitle(tr("app_title"))
     
     def test_whatsapp_connection(self):
         """Test WhatsApp Business API connection."""

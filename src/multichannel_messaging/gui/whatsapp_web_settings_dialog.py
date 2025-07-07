@@ -189,29 +189,42 @@ class WhatsAppWebSettingsDialog(QDialog):
         config_group = QGroupBox("Configuration Settings")
         config_layout = QGridLayout(config_group)
         
+        # Auto-send option
+        self.auto_send_checkbox = QCheckBox("Enable automatic sending (HIGHER RISK)")
+        self.auto_send_checkbox.setStyleSheet("QCheckBox { color: #d32f2f; font-weight: bold; }")
+        config_layout.addWidget(self.auto_send_checkbox, 0, 0, 1, 2)
+        
+        auto_send_help = QLabel(
+            "⚠️ Automatic sending uses system automation to press Enter key.\n"
+            "This increases the risk of account suspension significantly!"
+        )
+        auto_send_help.setStyleSheet("color: #d32f2f; font-style: italic; font-size: 10px;")
+        auto_send_help.setWordWrap(True)
+        config_layout.addWidget(auto_send_help, 1, 0, 1, 2)
+        
         # Rate limiting
-        config_layout.addWidget(QLabel("Messages per minute:"), 0, 0)
+        config_layout.addWidget(QLabel("Messages per minute:"), 2, 0)
         self.rate_limit_spin = QSpinBox()
         self.rate_limit_spin.setRange(1, 5)
         self.rate_limit_spin.setValue(3)
         self.rate_limit_spin.setSuffix(" msg/min")
-        config_layout.addWidget(self.rate_limit_spin, 0, 1)
+        config_layout.addWidget(self.rate_limit_spin, 2, 1)
         
         # Daily limit
-        config_layout.addWidget(QLabel("Daily message limit:"), 1, 0)
+        config_layout.addWidget(QLabel("Daily message limit:"), 3, 0)
         self.daily_limit_spin = QSpinBox()
         self.daily_limit_spin.setRange(1, 50)
         self.daily_limit_spin.setValue(30)
         self.daily_limit_spin.setSuffix(" messages")
-        config_layout.addWidget(self.daily_limit_spin, 1, 1)
+        config_layout.addWidget(self.daily_limit_spin, 3, 1)
         
         # Minimum delay
-        config_layout.addWidget(QLabel("Minimum delay between messages:"), 2, 0)
+        config_layout.addWidget(QLabel("Minimum delay between messages:"), 4, 0)
         self.delay_spin = QSpinBox()
         self.delay_spin.setRange(30, 180)
         self.delay_spin.setValue(45)
         self.delay_spin.setSuffix(" seconds")
-        config_layout.addWidget(self.delay_spin, 2, 1)
+        config_layout.addWidget(self.delay_spin, 4, 1)
         
         # Help text
         help_text = QLabel(
@@ -220,7 +233,7 @@ class WhatsAppWebSettingsDialog(QDialog):
         )
         help_text.setStyleSheet("color: #666; font-style: italic;")
         help_text.setWordWrap(True)
-        config_layout.addWidget(help_text, 3, 0, 1, 2)
+        config_layout.addWidget(help_text, 5, 0, 1, 2)
         
         layout.addWidget(config_group)
     
@@ -309,6 +322,7 @@ class WhatsAppWebSettingsDialog(QDialog):
         
         # Load configuration values
         if self.service.is_configured():
+            self.auto_send_checkbox.setChecked(self.service.auto_send)
             self.rate_limit_spin.setValue(self.service.rate_limit_per_minute)
             self.daily_limit_spin.setValue(self.service.daily_message_limit)
             self.delay_spin.setValue(self.service.min_delay_seconds)
@@ -404,6 +418,27 @@ class WhatsAppWebSettingsDialog(QDialog):
             )
             return
         
+        # Additional warning for auto-send
+        auto_send_enabled = self.auto_send_checkbox.isChecked()
+        if auto_send_enabled:
+            reply = QMessageBox.warning(
+                self,
+                "⚠️ AUTOMATIC SENDING WARNING",
+                "You have enabled automatic sending!\n\n"
+                "🚨 EXTREME RISKS:\n"
+                "• Much higher chance of account suspension\n"
+                "• Uses system automation (key presses)\n"
+                "• May be detected as bot behavior\n"
+                "• Could violate WhatsApp ToS more severely\n\n"
+                "Manual sending is STRONGLY recommended.\n\n"
+                "Are you absolutely sure you want to enable auto-send?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            
+            if reply != QMessageBox.Yes:
+                return
+        
         try:
             # Update service settings
             self.service.rate_limit_per_minute = self.rate_limit_spin.value()
@@ -411,25 +446,43 @@ class WhatsAppWebSettingsDialog(QDialog):
             self.service.min_delay_seconds = self.delay_spin.value()
             
             # Configure the service
-            success, message = self.service.configure_service(acknowledge_risks=True)
+            success, message = self.service.configure_service(
+                acknowledge_risks=True, 
+                auto_send=auto_send_enabled
+            )
             
             if success:
                 self.settings_changed.emit()
-                QMessageBox.information(
-                    self,
-                    "Configuration Saved",
+                
+                config_message = (
                     f"WhatsApp Web service has been configured.\n\n"
                     f"⚠️ Remember: Use at your own risk!\n\n"
                     f"Settings:\n"
+                    f"• Auto-send: {'ENABLED (HIGH RISK)' if auto_send_enabled else 'Disabled (Manual)'}\n"
                     f"• Rate limit: {self.rate_limit_spin.value()} msg/min\n"
                     f"• Daily limit: {self.daily_limit_spin.value()} messages\n"
                     f"• Min delay: {self.delay_spin.value()} seconds\n\n"
-                    f"How to use:\n"
-                    f"1. Select recipients and compose message\n"
-                    f"2. Choose 'WhatsApp Web' channel\n"
-                    f"3. Click 'Send Messages'\n"
-                    f"4. Manually send each message in browser"
                 )
+                
+                if auto_send_enabled:
+                    config_message += (
+                        "🤖 Automatic Sending Process:\n"
+                        "1. Select recipients and compose message\n"
+                        "2. Choose 'WhatsApp Web' channel\n"
+                        "3. Click 'Send Messages'\n"
+                        "4. Messages will be sent automatically\n\n"
+                        "⚠️ Monitor closely for any issues!"
+                    )
+                else:
+                    config_message += (
+                        "👤 Manual Sending Process:\n"
+                        "1. Select recipients and compose message\n"
+                        "2. Choose 'WhatsApp Web' channel\n"
+                        "3. Click 'Send Messages'\n"
+                        "4. Manually send each message in browser"
+                    )
+                
+                QMessageBox.information(self, "Configuration Saved", config_message)
                 self.accept()
             else:
                 QMessageBox.critical(

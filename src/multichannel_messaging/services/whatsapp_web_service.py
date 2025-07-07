@@ -11,6 +11,8 @@ import time
 import os
 import webbrowser
 import urllib.parse
+import subprocess
+import platform
 from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -38,6 +40,7 @@ class WhatsAppWebService:
     Features:
     - No external dependencies (uses built-in webbrowser)
     - Direct WhatsApp Web URL automation
+    - Optional automatic sending with AppleScript/PowerShell
     - Rate limiting and daily quotas
     - Message scheduling and delays
     - Local usage tracking
@@ -48,7 +51,8 @@ class WhatsAppWebService:
         self,
         rate_limit_per_minute: int = 3,  # Very conservative for web automation
         daily_message_limit: int = 30,   # Much lower for safety
-        min_delay_seconds: int = 45      # Longer delay for web automation
+        min_delay_seconds: int = 45,     # Longer delay for web automation
+        auto_send: bool = False          # Automatic sending option
     ):
         """
         Initialize WhatsApp Web automation service.
@@ -57,10 +61,12 @@ class WhatsAppWebService:
             rate_limit_per_minute: Messages per minute (very conservative)
             daily_message_limit: Daily message limit (much lower for safety)
             min_delay_seconds: Minimum delay between messages for safety
+            auto_send: Whether to automatically send messages (higher risk)
         """
         self.rate_limit_per_minute = rate_limit_per_minute
         self.daily_message_limit = daily_message_limit
         self.min_delay_seconds = min_delay_seconds
+        self.auto_send = auto_send
         
         # Configuration and tracking
         self.config_dir = get_config_dir()
@@ -88,12 +94,13 @@ class WhatsAppWebService:
         """Check if the service is configured and ready."""
         return self._is_configured
     
-    def configure_service(self, acknowledge_risks: bool = False) -> Tuple[bool, str]:
+    def configure_service(self, acknowledge_risks: bool = False, auto_send: bool = False) -> Tuple[bool, str]:
         """
         Configure the WhatsApp Web service.
         
         Args:
             acknowledge_risks: User must acknowledge the risks
+            auto_send: Enable automatic sending (higher risk)
             
         Returns:
             Tuple of (success, message)
@@ -106,6 +113,7 @@ class WhatsAppWebService:
             config = {
                 "configured": True,
                 "acknowledged_risks": True,
+                "auto_send": auto_send,
                 "configured_at": datetime.now().isoformat(),
                 "rate_limit_per_minute": self.rate_limit_per_minute,
                 "daily_message_limit": self.daily_message_limit,
@@ -118,7 +126,8 @@ class WhatsAppWebService:
                 json.dump(config, f, indent=2)
             
             self._is_configured = True
-            logger.info("WhatsApp Web service configured successfully")
+            self.auto_send = auto_send
+            logger.info(f"WhatsApp Web service configured successfully (auto_send={auto_send})")
             return True, "WhatsApp Web service configured successfully"
             
         except Exception as e:
@@ -134,6 +143,7 @@ class WhatsAppWebService:
                     config = json.load(f)
                 
                 self._is_configured = config.get("configured", False)
+                self.auto_send = config.get("auto_send", False)
                 self.rate_limit_per_minute = config.get("rate_limit_per_minute", 3)
                 self.daily_message_limit = config.get("daily_message_limit", 30)
                 self.min_delay_seconds = config.get("min_delay_seconds", 45)
@@ -281,8 +291,21 @@ class WhatsAppWebService:
                 # Track the message attempt
                 self._track_message_sent()
                 
-                logger.info(f"✅ WhatsApp Web opened for {customer.name} ({phone})")
-                logger.info("⚠️ Please manually send the message in WhatsApp Web")
+                if self.auto_send:
+                    # Wait for page to load
+                    time.sleep(5)
+                    
+                    # Try to automatically send the message
+                    auto_send_success = self._auto_send_message()
+                    
+                    if auto_send_success:
+                        logger.info(f"✅ WhatsApp message automatically sent to {customer.name} ({phone})")
+                    else:
+                        logger.warning(f"⚠️ WhatsApp Web opened for {customer.name} ({phone}) - Auto-send failed, manual send required")
+                else:
+                    logger.info(f"✅ WhatsApp Web opened for {customer.name} ({phone})")
+                    logger.info("⚠️ Please manually send the message in WhatsApp Web")
+                
                 return True
             else:
                 logger.error(f"Failed to open WhatsApp Web for {customer.name}")
@@ -293,6 +316,94 @@ class WhatsAppWebService:
             error_msg = f"Failed to send WhatsApp message to {customer.name}: {e}"
             logger.error(error_msg)
             self._last_error = str(e)
+            return False
+    
+    def _auto_send_message(self) -> bool:
+        """
+        Attempt to automatically send the message using system automation.
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            system = platform.system().lower()
+            
+            if system == "darwin":  # macOS
+                return self._auto_send_macos()
+            elif system == "windows":  # Windows
+                return self._auto_send_windows()
+            else:  # Linux or other
+                return self._auto_send_linux()
+                
+        except Exception as e:
+            logger.error(f"Auto-send failed: {e}")
+            return False
+    
+    def _auto_send_macos(self) -> bool:
+        """Auto-send message on macOS using AppleScript."""
+        try:
+            # AppleScript to press Enter key in the active browser window
+            applescript = '''
+            tell application "System Events"
+                delay 2
+                key code 36
+            end tell
+            '''
+            
+            result = subprocess.run(
+                ["osascript", "-e", applescript],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            return result.returncode == 0
+            
+        except Exception as e:
+            logger.error(f"macOS auto-send failed: {e}")
+            return False
+    
+    def _auto_send_windows(self) -> bool:
+        """Auto-send message on Windows using PowerShell."""
+        try:
+            # PowerShell script to send Enter key
+            powershell_script = '''
+            Add-Type -AssemblyName System.Windows.Forms
+            Start-Sleep -Seconds 2
+            [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
+            '''
+            
+            result = subprocess.run(
+                ["powershell", "-Command", powershell_script],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            return result.returncode == 0
+            
+        except Exception as e:
+            logger.error(f"Windows auto-send failed: {e}")
+            return False
+    
+    def _auto_send_linux(self) -> bool:
+        """Auto-send message on Linux using xdotool."""
+        try:
+            # Try to use xdotool to send Enter key
+            result = subprocess.run(
+                ["xdotool", "key", "Return"],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            return result.returncode == 0
+            
+        except FileNotFoundError:
+            logger.warning("xdotool not found - auto-send not available on Linux")
+            return False
+        except Exception as e:
+            logger.error(f"Linux auto-send failed: {e}")
             return False
     
     def _format_phone_number(self, phone: str) -> Optional[str]:
