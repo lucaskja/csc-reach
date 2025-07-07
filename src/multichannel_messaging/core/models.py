@@ -28,15 +28,51 @@ class MessageStatus(Enum):
 
 @dataclass
 class Customer:
-    """Customer data model."""
+    """Customer data model with multi-channel support."""
     name: str
     company: str
     phone: str
     email: str
+    whatsapp_opt_in: bool = True  # Consent for WhatsApp messaging
+    preferred_channel: str = "both"  # email, whatsapp, both
     
     def __post_init__(self):
-        """Validate customer data after initialization."""
+        """Validate and format customer data after initialization."""
+        # Clean and format data
+        self.name = self.name.strip() if self.name else ""
+        self.company = self.company.strip() if self.company else ""
+        self.phone = self._format_phone_number(self.phone) if self.phone else ""
+        self.email = self.email.strip().lower() if self.email else ""
+        
+        # Validate data
         self.validate()
+    
+    def _format_phone_number(self, phone: str) -> str:
+        """
+        Format phone number for WhatsApp compatibility.
+        
+        Args:
+            phone: Raw phone number
+            
+        Returns:
+            Formatted phone number
+        """
+        if not phone:
+            return ""
+        
+        # Remove common formatting characters
+        cleaned = re.sub(r'[^\d+]', '', phone.strip())
+        
+        # Ensure it starts with + for international format
+        if cleaned and not cleaned.startswith('+'):
+            # If it looks like a US number (10 digits), add +1
+            if len(cleaned) == 10 and cleaned.isdigit():
+                cleaned = '+1' + cleaned
+            # If it looks like it's missing the +, add it
+            elif len(cleaned) > 10 and cleaned.isdigit():
+                cleaned = '+' + cleaned
+        
+        return cleaned
     
     def validate(self) -> None:
         """
@@ -106,12 +142,13 @@ class Customer:
 
 @dataclass
 class MessageTemplate:
-    """Message template model."""
+    """Multi-channel message template model."""
     id: str
     name: str
-    channel: MessageChannel
+    channels: List[str] = field(default_factory=lambda: ["email"])  # Supported channels
     subject: str = ""  # For email only
-    content: str = ""
+    content: str = ""  # Email content
+    whatsapp_content: str = ""  # WhatsApp-specific content
     language: str = "en"
     variables: List[str] = field(default_factory=list)
     created_at: datetime = field(default_factory=datetime.now)
@@ -119,8 +156,14 @@ class MessageTemplate:
     
     def __post_init__(self):
         """Validate template after initialization."""
-        if isinstance(self.channel, str):
-            self.channel = MessageChannel(self.channel)
+        # Ensure channels is a list
+        if isinstance(self.channels, str):
+            self.channels = [self.channels]
+        
+        # If no WhatsApp content specified, use regular content
+        if not self.whatsapp_content and "whatsapp" in self.channels:
+            self.whatsapp_content = self.content
+        
         self.validate()
     
     def validate(self) -> None:
@@ -138,30 +181,91 @@ class MessageTemplate:
         if not self.name or not self.name.strip():
             errors.append("Template name is required")
         
-        if not self.content or not self.content.strip():
-            errors.append("Template content is required")
+        if not self.channels:
+            errors.append("At least one channel must be specified")
         
-        if self.channel == MessageChannel.EMAIL and not self.subject.strip():
-            errors.append("Email template must have a subject")
+        # Validate channel-specific requirements
+        if "email" in self.channels:
+            if not self.subject.strip():
+                errors.append("Email template must have a subject")
+            if not self.content.strip():
+                errors.append("Email template must have content")
+        
+        if "whatsapp" in self.channels:
+            if not self.whatsapp_content.strip():
+                errors.append("WhatsApp template must have content")
         
         if errors:
             raise ValidationError(f"Template validation failed: {'; '.join(errors)}")
     
     def render(self, customer: Customer) -> Dict[str, str]:
         """
-        Render template with customer data.
+        Render template with customer data for all channels.
         
         Args:
             customer: Customer data to use for rendering
             
         Returns:
-            Dictionary with rendered content
+            Dictionary with rendered content for each channel
         """
         customer_data = customer.to_dict()
+        result = {}
         
-        # Render content
-        rendered_content = self.content
-        for var in self.variables:
+        # Render email content
+        if "email" in self.channels:
+            rendered_subject = self.subject
+            rendered_content = self.content
+            
+            for var in self.variables:
+                placeholder = f"{{{var}}}"
+                value = str(customer_data.get(var, placeholder))
+                rendered_subject = rendered_subject.replace(placeholder, value)
+                rendered_content = rendered_content.replace(placeholder, value)
+            
+            result["subject"] = rendered_subject
+            result["content"] = rendered_content
+        
+        # Render WhatsApp content
+        if "whatsapp" in self.channels:
+            rendered_whatsapp = self.whatsapp_content
+            
+            for var in self.variables:
+                placeholder = f"{{{var}}}"
+                value = str(customer_data.get(var, placeholder))
+                rendered_whatsapp = rendered_whatsapp.replace(placeholder, value)
+            
+            result["whatsapp_content"] = rendered_whatsapp
+        
+        return result
+    
+    def supports_channel(self, channel: str) -> bool:
+        """
+        Check if template supports a specific channel.
+        
+        Args:
+            channel: Channel to check (email, whatsapp)
+            
+        Returns:
+            True if channel is supported
+        """
+        return channel in self.channels
+    
+    def get_content_for_channel(self, channel: str) -> str:
+        """
+        Get content for a specific channel.
+        
+        Args:
+            channel: Channel to get content for
+            
+        Returns:
+            Content for the specified channel
+        """
+        if channel == "email":
+            return self.content
+        elif channel == "whatsapp":
+            return self.whatsapp_content
+        else:
+            return ""
             if var in customer_data:
                 rendered_content = rendered_content.replace(f"{{{var}}}", customer_data[var])
         
@@ -229,13 +333,16 @@ class MessageTemplate:
 
 @dataclass
 class MessageRecord:
-    """Individual message record."""
+    """Individual message record with multi-channel support."""
     customer: Customer
     template: MessageTemplate
+    channel: str = "email"  # Channel used for this message
     status: MessageStatus = MessageStatus.PENDING
     rendered_content: Dict[str, str] = field(default_factory=dict)
     error_message: Optional[str] = None
     sent_at: Optional[datetime] = None
+    message_id: Optional[str] = None  # External message ID (WhatsApp, email, etc.)
+    delivery_status: Optional[str] = None  # Channel-specific delivery status
     
     def __post_init__(self):
         """Initialize message record."""
@@ -246,26 +353,35 @@ class MessageRecord:
         if not self.rendered_content:
             self.rendered_content = self.template.render(self.customer)
     
-    def mark_as_sent(self) -> None:
+    def mark_as_sent(self, message_id: Optional[str] = None) -> None:
         """Mark message as sent."""
         self.status = MessageStatus.SENT
         self.sent_at = datetime.now()
         self.error_message = None
+        if message_id:
+            self.message_id = message_id
     
     def mark_as_failed(self, error_message: str) -> None:
         """Mark message as failed."""
         self.status = MessageStatus.FAILED
         self.error_message = error_message
     
+    def update_delivery_status(self, delivery_status: str) -> None:
+        """Update delivery status (for WhatsApp, etc.)."""
+        self.delivery_status = delivery_status
+    
     def to_dict(self) -> Dict[str, Any]:
         """Convert message record to dictionary."""
         return {
             "customer": self.customer.to_dict(),
             "template_id": self.template.id,
+            "channel": self.channel,
             "status": self.status.value,
             "rendered_content": self.rendered_content,
             "error_message": self.error_message,
-            "sent_at": self.sent_at.isoformat() if self.sent_at else None
+            "sent_at": self.sent_at.isoformat() if self.sent_at else None,
+            "message_id": self.message_id,
+            "delivery_status": self.delivery_status
         }
 
 

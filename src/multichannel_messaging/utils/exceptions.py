@@ -46,3 +46,13 @@ class TemplateError(MultiChannelMessagingError):
 class ServiceUnavailableError(MultiChannelMessagingError):
     """Raised when a required service is unavailable."""
     pass
+
+
+class WhatsAppAPIError(ServiceUnavailableError):
+    """Raised when WhatsApp Business API operations fail."""
+    pass
+
+
+class WhatsAppConfigurationError(ConfigurationError):
+    """Raised when WhatsApp configuration is invalid or missing."""
+    pass
