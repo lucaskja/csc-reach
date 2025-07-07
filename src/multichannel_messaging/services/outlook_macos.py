@@ -113,6 +113,98 @@ class OutlookMacOSService:
             logger.error(f"Failed to start Outlook: {e}")
             return False
     
+    def _format_plain_text(self, text: str) -> str:
+        """
+        Format plain text to ensure proper line breaks are preserved.
+        
+        Args:
+            text: Plain text content
+            
+        Returns:
+            Formatted text with proper line breaks
+        """
+        if not text:
+            return ""
+        
+        # Normalize line endings to \n
+        formatted = text.replace('\r\n', '\n').replace('\r', '\n')
+        
+        # Ensure we have proper line breaks for AppleScript
+        # AppleScript uses \r for line breaks in strings
+        formatted = formatted.replace('\n', '\r')
+        
+        return formatted
+    
+    def _escape_for_applescript(self, text: str) -> str:
+        """
+        Properly escape text for AppleScript.
+        
+        Args:
+            text: Text to escape
+            
+        Returns:
+            Escaped text safe for AppleScript
+        """
+        if not text:
+            return ""
+        
+        # Escape backslashes first
+        escaped = text.replace('\\', '\\\\')
+        
+        # Escape quotes
+        escaped = escaped.replace('"', '\\"')
+        
+        # Don't escape \r since we want those for line breaks in AppleScript
+        # Escape tabs
+        escaped = escaped.replace('\t', '\\t')
+        
+        return escaped
+    
+    def _convert_to_html(self, text: str) -> str:
+        """
+        Convert plain text to HTML format, preserving line breaks and formatting.
+        
+        Args:
+            text: Plain text content
+            
+        Returns:
+            HTML formatted content
+        """
+        if not text:
+            return ""
+        
+        # Escape HTML special characters
+        html_text = (text
+                    .replace('&', '&amp;')
+                    .replace('<', '&lt;')
+                    .replace('>', '&gt;')
+                    .replace('"', '&quot;')
+                    .replace("'", '&#x27;'))
+        
+        # Convert line breaks to HTML
+        # First, normalize line endings
+        html_text = html_text.replace('\r\n', '\n').replace('\r', '\n')
+        
+        # Split into paragraphs (double line breaks)
+        paragraphs = html_text.split('\n\n')
+        
+        # Process each paragraph
+        formatted_paragraphs = []
+        for paragraph in paragraphs:
+            if paragraph.strip():
+                # Convert single line breaks within paragraphs to <br>
+                formatted_paragraph = paragraph.replace('\n', '<br>')
+                formatted_paragraphs.append(f'<p>{formatted_paragraph}</p>')
+        
+        # Join paragraphs
+        html_content = '\n'.join(formatted_paragraphs)
+        
+        # If no paragraphs were created (single line), just convert line breaks
+        if not formatted_paragraphs and html_text.strip():
+            html_content = html_text.replace('\n', '<br>')
+        
+        return html_content
+    
     def _run_applescript(self, script: str) -> str:
         """
         Run AppleScript and return the result.
@@ -176,12 +268,15 @@ class OutlookMacOSService:
             subject = rendered.get('subject', '')
             content = rendered.get('content', '')
             
-            # Escape quotes and special characters for AppleScript
-            subject_escaped = subject.replace('"', '\\"').replace('\\', '\\\\')
-            content_escaped = content.replace('"', '\\"').replace('\\', '\\\\')
-            email_escaped = customer.email.replace('"', '\\"')
+            # Ensure proper line breaks in content
+            formatted_content = self._format_plain_text(content)
             
-            # Create and send email using AppleScript
+            # Escape quotes and special characters for AppleScript
+            subject_escaped = self._escape_for_applescript(subject)
+            content_escaped = self._escape_for_applescript(formatted_content)
+            email_escaped = self._escape_for_applescript(customer.email)
+            
+            # Create and send email using AppleScript with plain text
             script = f'''
             tell application "Microsoft Outlook"
                 set newMessage to make new outgoing message with properties {{subject:"{subject_escaped}", content:"{content_escaped}"}}
@@ -297,10 +392,13 @@ class OutlookMacOSService:
             subject = rendered.get('subject', '')
             content = rendered.get('content', '')
             
+            # Ensure proper line breaks in content
+            formatted_content = self._format_plain_text(content)
+            
             # Escape quotes and special characters for AppleScript
-            subject_escaped = subject.replace('"', '\\"').replace('\\', '\\\\')
-            content_escaped = content.replace('"', '\\"').replace('\\', '\\\\')
-            email_escaped = customer.email.replace('"', '\\"')
+            subject_escaped = self._escape_for_applescript(subject)
+            content_escaped = self._escape_for_applescript(formatted_content)
+            email_escaped = self._escape_for_applescript(customer.email)
             
             # Create draft email using AppleScript
             script = f'''

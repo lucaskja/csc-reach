@@ -245,6 +245,12 @@ class MainWindow(QMainWindow):
         self.template_combo = QComboBox()
         self.template_combo.addItem("Default Welcome Email")
         template_selector_layout.addWidget(self.template_combo)
+        
+        # Add preview button
+        self.preview_btn = QPushButton("Preview Email")
+        self.preview_btn.clicked.connect(self.preview_email)
+        template_selector_layout.addWidget(self.preview_btn)
+        
         template_layout.addLayout(template_selector_layout)
         
         # Subject field
@@ -507,6 +513,70 @@ The Team""",
             QMessageBox.warning(self, "Sending Error", message)
         
         self.update_send_button_state()
+    
+    def preview_email(self):
+        """Preview email with sample customer data."""
+        if not self.customers:
+            # Use sample customer data for preview
+            sample_customer = Customer(
+                name="John Doe",
+                company="Example Corp",
+                phone="+1-555-0123",
+                email="john.doe@example.com"
+            )
+        else:
+            # Use first customer from the list
+            sample_customer = self.customers[0]
+        
+        # Update template with current content
+        self.current_template.subject = self.subject_edit.toPlainText()
+        self.current_template.content = self.content_edit.toPlainText()
+        
+        # Render template
+        rendered = self.current_template.render(sample_customer)
+        subject = rendered.get('subject', '')
+        content = rendered.get('content', '')
+        
+        # Convert content to HTML for better display
+        html_content = self._convert_text_to_html(content)
+        
+        # Create preview dialog
+        preview_dialog = QMessageBox(self)
+        preview_dialog.setWindowTitle("Email Preview")
+        preview_dialog.setTextFormat(Qt.RichText)
+        
+        preview_text = f"""
+        <h3>Subject:</h3>
+        <p><strong>{subject}</strong></p>
+        
+        <h3>Content:</h3>
+        <div style="border: 1px solid #ccc; padding: 10px; background-color: #f9f9f9;">
+        {html_content}
+        </div>
+        
+        <p><em>Preview using: {sample_customer.name} ({sample_customer.email})</em></p>
+        """
+        
+        preview_dialog.setText(preview_text)
+        preview_dialog.setStandardButtons(QMessageBox.Ok)
+        preview_dialog.exec()
+    
+    def _convert_text_to_html(self, text: str) -> str:
+        """Convert plain text to HTML for display."""
+        if not text:
+            return ""
+        
+        # Escape HTML special characters
+        html_text = (text
+                    .replace('&', '&amp;')
+                    .replace('<', '&lt;')
+                    .replace('>', '&gt;'))
+        
+        # Convert line breaks to HTML
+        html_text = html_text.replace('\n\n', '</p><p>').replace('\n', '<br>')
+        
+        # Wrap in paragraph tags
+        return f'<p>{html_text}</p>'
     
     def log_message(self, message: str):
         """Add message to log area."""
