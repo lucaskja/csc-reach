@@ -52,7 +52,8 @@ class WhatsAppWebService:
         rate_limit_per_minute: int = 3,  # Very conservative for web automation
         daily_message_limit: int = 30,   # Much lower for safety
         min_delay_seconds: int = 45,     # Longer delay for web automation
-        auto_send: bool = False          # Automatic sending option
+        auto_send: bool = False,         # Automatic sending option
+        auto_send_delay: int = 5         # Delay before auto-send attempt
     ):
         """
         Initialize WhatsApp Web automation service.
@@ -62,11 +63,13 @@ class WhatsAppWebService:
             daily_message_limit: Daily message limit (much lower for safety)
             min_delay_seconds: Minimum delay between messages for safety
             auto_send: Whether to automatically send messages (higher risk)
+            auto_send_delay: Seconds to wait before attempting auto-send
         """
         self.rate_limit_per_minute = rate_limit_per_minute
         self.daily_message_limit = daily_message_limit
         self.min_delay_seconds = min_delay_seconds
         self.auto_send = auto_send
+        self.auto_send_delay = auto_send_delay
         
         # Configuration and tracking
         self.config_dir = get_config_dir()
@@ -114,6 +117,7 @@ class WhatsAppWebService:
                 "configured": True,
                 "acknowledged_risks": True,
                 "auto_send": auto_send,
+                "auto_send_delay": self.auto_send_delay,
                 "configured_at": datetime.now().isoformat(),
                 "rate_limit_per_minute": self.rate_limit_per_minute,
                 "daily_message_limit": self.daily_message_limit,
@@ -144,6 +148,7 @@ class WhatsAppWebService:
                 
                 self._is_configured = config.get("configured", False)
                 self.auto_send = config.get("auto_send", False)
+                self.auto_send_delay = config.get("auto_send_delay", 5)
                 self.rate_limit_per_minute = config.get("rate_limit_per_minute", 3)
                 self.daily_message_limit = config.get("daily_message_limit", 30)
                 self.min_delay_seconds = config.get("min_delay_seconds", 45)
@@ -284,16 +289,19 @@ class WhatsAppWebService:
             
             logger.info(f"Opening WhatsApp Web for {customer.name} ({phone})")
             
-            # Open WhatsApp Web in default browser
-            success = webbrowser.open(whatsapp_url)
+            # Open WhatsApp Web in Chrome specifically
+            success = self._open_in_chrome(whatsapp_url)
             
             if success:
                 # Track the message attempt
                 self._track_message_sent()
                 
                 if self.auto_send:
-                    # Wait for page to load
-                    time.sleep(5)
+                    logger.info(f"🤖 Attempting automatic send for {customer.name} ({phone})")
+                    
+                    # Wait for page to load (configurable delay)
+                    logger.info(f"⏱️ Waiting {self.auto_send_delay} seconds for WhatsApp Web to load...")
+                    time.sleep(self.auto_send_delay)
                     
                     # Try to automatically send the message
                     auto_send_success = self._auto_send_message()
@@ -302,6 +310,7 @@ class WhatsAppWebService:
                         logger.info(f"✅ WhatsApp message automatically sent to {customer.name} ({phone})")
                     else:
                         logger.warning(f"⚠️ WhatsApp Web opened for {customer.name} ({phone}) - Auto-send failed, manual send required")
+                        logger.info("💡 Tip: Make sure WhatsApp Web is logged in and Chrome is the active browser")
                 else:
                     logger.info(f"✅ WhatsApp Web opened for {customer.name} ({phone})")
                     logger.info("⚠️ Please manually send the message in WhatsApp Web")
@@ -309,7 +318,7 @@ class WhatsAppWebService:
                 return True
             else:
                 logger.error(f"Failed to open WhatsApp Web for {customer.name}")
-                self._last_error = "Failed to open browser"
+                self._last_error = "Failed to open Chrome browser"
                 return False
             
         except Exception as e:
@@ -328,25 +337,95 @@ class WhatsAppWebService:
         try:
             system = platform.system().lower()
             
+            # Try platform-specific automation first
+            success = False
             if system == "darwin":  # macOS
-                return self._auto_send_macos()
+                success = self._auto_send_macos()
             elif system == "windows":  # Windows
-                return self._auto_send_windows()
+                success = self._auto_send_windows()
             else:  # Linux or other
-                return self._auto_send_linux()
+                success = self._auto_send_linux()
+            
+            # If platform-specific method failed, try JavaScript injection
+            if not success:
+                logger.info("Platform-specific auto-send failed, trying JavaScript method...")
+                success = self._auto_send_javascript()
+            
+            return success
                 
         except Exception as e:
             logger.error(f"Auto-send failed: {e}")
             return False
     
-    def _auto_send_macos(self) -> bool:
-        """Auto-send message on macOS using AppleScript."""
+    def _auto_send_javascript(self) -> bool:
+        """
+        Attempt to auto-send using JavaScript injection via AppleScript/PowerShell.
+        This method tries to execute JavaScript directly in the browser.
+        """
         try:
-            # AppleScript to press Enter key in the active browser window
+            system = platform.system().lower()
+            
+            if system == "darwin":  # macOS
+                return self._auto_send_javascript_macos()
+            elif system == "windows":  # Windows
+                return self._auto_send_javascript_windows()
+            else:
+                return False
+                
+        except Exception as e:
+            logger.error(f"JavaScript auto-send failed: {e}")
+            return False
+    
+    def _auto_send_javascript_macos(self) -> bool:
+        """Auto-send using JavaScript on macOS - Chrome only."""
+        try:
+            # AppleScript to execute JavaScript in Chrome only
             applescript = '''
             tell application "System Events"
-                delay 2
-                key code 36
+                -- Try Chrome only
+                try
+                    tell application "Google Chrome"
+                        if (count of windows) > 0 then
+                            repeat with w from 1 to count of windows
+                                repeat with t from 1 to count of tabs of window w
+                                    if title of tab t of window w contains "WhatsApp" then
+                                        set active tab index of window w to t
+                                        set index of window w to 1
+                                        activate
+                                        delay 1
+                                        execute tab t of window w javascript "
+                                            // Try multiple selectors for the send button
+                                            var sendBtn = document.querySelector('[data-testid=\"send\"]') || 
+                                                         document.querySelector('[aria-label*=\"Send\"]') ||
+                                                         document.querySelector('button[aria-label*=\"Send\"]') ||
+                                                         document.querySelector('span[data-testid=\"send\"]');
+                                            if (sendBtn) {
+                                                sendBtn.click();
+                                                console.log('Send button clicked');
+                                            } else {
+                                                // Fallback: simulate Enter key
+                                                var event = new KeyboardEvent('keydown', {
+                                                    key: 'Enter', 
+                                                    code: 'Enter',
+                                                    keyCode: 13,
+                                                    which: 13,
+                                                    bubbles: true
+                                                });
+                                                document.dispatchEvent(event);
+                                                console.log('Enter key simulated');
+                                            }
+                                        "
+                                        return true
+                                    end if
+                                end repeat
+                            end repeat
+                        end if
+                    end tell
+                on error
+                    return false
+                end try
+                
+                return false
             end tell
             '''
             
@@ -354,23 +433,144 @@ class WhatsAppWebService:
                 ["osascript", "-e", applescript],
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=8
             )
             
             return result.returncode == 0
             
         except Exception as e:
-            logger.error(f"macOS auto-send failed: {e}")
+            logger.error(f"JavaScript Chrome auto-send failed: {e}")
+            return False
+    
+    def _auto_send_javascript_windows(self) -> bool:
+        """Auto-send using JavaScript on Windows (limited support)."""
+        try:
+            # This is more limited on Windows, but we can try
+            logger.info("JavaScript auto-send not fully supported on Windows, using key simulation")
+            return False
+            
+        except Exception as e:
+            logger.error(f"JavaScript Windows auto-send failed: {e}")
+            return False
+    
+    def _auto_send_macos(self) -> bool:
+        """Auto-send message on macOS using AppleScript - Chrome only."""
+        try:
+            # Simplified AppleScript to target Chrome specifically
+            applescript = '''
+            tell application "System Events"
+                delay 1
+                
+                try
+                    tell application "Google Chrome"
+                        if (count of windows) > 0 then
+                            set chromeFound to false
+                            repeat with w from 1 to count of windows
+                                repeat with t from 1 to count of tabs of window w
+                                    if title of tab t of window w contains "WhatsApp" then
+                                        set active tab index of window w to t
+                                        set index of window w to 1
+                                        activate
+                                        set chromeFound to true
+                                        exit repeat
+                                    end if
+                                end repeat
+                                if chromeFound then exit repeat
+                            end repeat
+                            
+                            if chromeFound then
+                                delay 1
+                                key code 36
+                                return true
+                            end if
+                        end if
+                    end tell
+                on error
+                    return false
+                end try
+                
+                return false
+            end tell
+            '''
+            
+            result = subprocess.run(
+                ["osascript", "-e", applescript],
+                capture_output=True,
+                text=True,
+                timeout=8
+            )
+            
+            success = result.returncode == 0
+            if not success:
+                logger.warning(f"Chrome auto-send failed: {result.stderr}")
+            
+            return success
+            
+        except subprocess.TimeoutExpired:
+            logger.error("Chrome auto-send timed out")
+            return False
+        except Exception as e:
+            logger.error(f"Chrome auto-send failed: {e}")
             return False
     
     def _auto_send_windows(self) -> bool:
-        """Auto-send message on Windows using PowerShell."""
+        """Auto-send message on Windows using PowerShell - Chrome only."""
         try:
-            # PowerShell script to send Enter key
+            # Enhanced PowerShell script to target Chrome specifically
             powershell_script = '''
             Add-Type -AssemblyName System.Windows.Forms
+            Add-Type -AssemblyName System.Drawing
+            
+            # Wait for WhatsApp Web to load
             Start-Sleep -Seconds 2
-            [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
+            
+            # Try to find Chrome with WhatsApp Web
+            $chromeFound = $false
+            
+            # Get Chrome processes only
+            $chromeProcesses = Get-Process -Name "chrome" -ErrorAction SilentlyContinue
+            
+            if ($chromeProcesses) {
+                # Try to bring Chrome with WhatsApp to front
+                foreach ($proc in $chromeProcesses) {
+                    try {
+                        if ($proc.MainWindowTitle -like "*WhatsApp*") {
+                            [System.Windows.Forms.Application]::SetForegroundWindow($proc.MainWindowHandle)
+                            $chromeFound = $true
+                            break
+                        }
+                    } catch {}
+                }
+                
+                # If no specific WhatsApp window found, try the first Chrome window
+                if (-not $chromeFound) {
+                    foreach ($proc in $chromeProcesses) {
+                        try {
+                            if ($proc.MainWindowHandle -ne 0) {
+                                [System.Windows.Forms.Application]::SetForegroundWindow($proc.MainWindowHandle)
+                                $chromeFound = $true
+                                break
+                            }
+                        } catch {}
+                    }
+                }
+            }
+            
+            if ($chromeFound) {
+                # Wait for window to be active
+                Start-Sleep -Seconds 1
+                
+                # Try Enter key (most reliable method)
+                [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
+                Start-Sleep -Milliseconds 500
+                
+                # If that didn't work, try Ctrl+Enter
+                [System.Windows.Forms.SendKeys]::SendWait("^{ENTER}")
+                
+                return $true
+            } else {
+                return $false
+            }
             '''
             
             result = subprocess.run(
@@ -380,10 +580,17 @@ class WhatsAppWebService:
                 timeout=10
             )
             
-            return result.returncode == 0
+            success = result.returncode == 0
+            if not success:
+                logger.warning(f"Chrome PowerShell auto-send failed: {result.stderr}")
             
+            return success
+            
+        except subprocess.TimeoutExpired:
+            logger.error("Windows Chrome auto-send timed out")
+            return False
         except Exception as e:
-            logger.error(f"Windows auto-send failed: {e}")
+            logger.error(f"Windows Chrome auto-send failed: {e}")
             return False
     
     def _auto_send_linux(self) -> bool:
@@ -466,7 +673,167 @@ class WhatsAppWebService:
         
         return rendered_content
     
+    def _open_in_chrome(self, url: str) -> bool:
+        """
+        Open URL in Chrome specifically.
+        
+        Args:
+            url: URL to open
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            system = platform.system().lower()
+            
+            if system == "darwin":  # macOS
+                # Try to open in Chrome specifically
+                result = subprocess.run([
+                    "open", "-a", "Google Chrome", url
+                ], capture_output=True, text=True, timeout=5)
+                
+                if result.returncode == 0:
+                    return True
+                else:
+                    # Fallback to default browser
+                    logger.warning("Chrome not found, using default browser")
+                    return webbrowser.open(url)
+                    
+            elif system == "windows":  # Windows
+                # Try to open in Chrome specifically
+                chrome_paths = [
+                    r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+                    r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+                    os.path.expanduser(r"~\AppData\Local\Google\Chrome\Application\chrome.exe")
+                ]
+                
+                for chrome_path in chrome_paths:
+                    if os.path.exists(chrome_path):
+                        result = subprocess.run([
+                            chrome_path, url
+                        ], capture_output=True, text=True, timeout=5)
+                        
+                        if result.returncode == 0:
+                            return True
+                
+                # Fallback to default browser
+                logger.warning("Chrome not found, using default browser")
+                return webbrowser.open(url)
+                
+            else:  # Linux
+                # Try to open in Chrome specifically
+                chrome_commands = ["google-chrome", "google-chrome-stable", "chromium-browser", "chromium"]
+                
+                for chrome_cmd in chrome_commands:
+                    try:
+                        result = subprocess.run([
+                            chrome_cmd, url
+                        ], capture_output=True, text=True, timeout=5)
+                        
+                        if result.returncode == 0:
+                            return True
+                    except FileNotFoundError:
+                        continue
+                
+                # Fallback to default browser
+                logger.warning("Chrome not found, using default browser")
+                return webbrowser.open(url)
+                
+        except Exception as e:
+            logger.error(f"Failed to open URL in Chrome: {e}")
+            # Final fallback to default browser
+            return webbrowser.open(url)
+    
     def _create_whatsapp_url(self, phone: str, message: str) -> str:
+        """
+        Create WhatsApp Web URL with pre-filled message.
+        
+        Args:
+            phone: Formatted phone number
+            message: Message content
+            
+        Returns:
+            WhatsApp Web URL
+        """
+        # URL encode the message
+        encoded_message = urllib.parse.quote(message)
+        
+        # Create WhatsApp Web URL
+        # Format: https://web.whatsapp.com/send?phone=PHONE&text=MESSAGE
+        url = f"https://web.whatsapp.com/send?phone={phone}&text={encoded_message}"
+        
+        return url
+    
+    def _open_in_chrome(self, url: str) -> bool:
+        """
+        Open URL in Chrome specifically.
+        
+        Args:
+            url: URL to open
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            system = platform.system().lower()
+            
+            if system == "darwin":  # macOS
+                # Try to open in Chrome specifically
+                result = subprocess.run([
+                    "open", "-a", "Google Chrome", url
+                ], capture_output=True, text=True, timeout=5)
+                
+                if result.returncode == 0:
+                    return True
+                else:
+                    # Fallback to default browser
+                    logger.warning("Chrome not found, using default browser")
+                    return webbrowser.open(url)
+                    
+            elif system == "windows":  # Windows
+                # Try to open in Chrome specifically
+                chrome_paths = [
+                    r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+                    r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+                    os.path.expanduser(r"~\AppData\Local\Google\Chrome\Application\chrome.exe")
+                ]
+                
+                for chrome_path in chrome_paths:
+                    if os.path.exists(chrome_path):
+                        result = subprocess.run([
+                            chrome_path, url
+                        ], capture_output=True, text=True, timeout=5)
+                        
+                        if result.returncode == 0:
+                            return True
+                
+                # Fallback to default browser
+                logger.warning("Chrome not found, using default browser")
+                return webbrowser.open(url)
+                
+            else:  # Linux
+                # Try to open in Chrome specifically
+                chrome_commands = ["google-chrome", "google-chrome-stable", "chromium-browser", "chromium"]
+                
+                for chrome_cmd in chrome_commands:
+                    try:
+                        result = subprocess.run([
+                            chrome_cmd, url
+                        ], capture_output=True, text=True, timeout=5)
+                        
+                        if result.returncode == 0:
+                            return True
+                    except FileNotFoundError:
+                        continue
+                
+                # Fallback to default browser
+                logger.warning("Chrome not found, using default browser")
+                return webbrowser.open(url)
+                
+        except Exception as e:
+            logger.error(f"Failed to open URL in Chrome: {e}")
+            # Final fallback to default browser
+            return webbrowser.open(url)
         """
         Create WhatsApp Web URL with pre-filled message.
         

@@ -202,29 +202,38 @@ class WhatsAppWebSettingsDialog(QDialog):
         auto_send_help.setWordWrap(True)
         config_layout.addWidget(auto_send_help, 1, 0, 1, 2)
         
+        # Auto-send delay
+        config_layout.addWidget(QLabel("Auto-send delay:"), 2, 0)
+        self.auto_send_delay_spin = QSpinBox()
+        self.auto_send_delay_spin.setRange(3, 15)
+        self.auto_send_delay_spin.setValue(5)
+        self.auto_send_delay_spin.setSuffix(" seconds")
+        self.auto_send_delay_spin.setToolTip("Time to wait for WhatsApp Web to load before attempting auto-send")
+        config_layout.addWidget(self.auto_send_delay_spin, 2, 1)
+        
         # Rate limiting
-        config_layout.addWidget(QLabel("Messages per minute:"), 2, 0)
+        config_layout.addWidget(QLabel("Messages per minute:"), 3, 0)
         self.rate_limit_spin = QSpinBox()
         self.rate_limit_spin.setRange(1, 5)
         self.rate_limit_spin.setValue(3)
         self.rate_limit_spin.setSuffix(" msg/min")
-        config_layout.addWidget(self.rate_limit_spin, 2, 1)
+        config_layout.addWidget(self.rate_limit_spin, 3, 1)
         
         # Daily limit
-        config_layout.addWidget(QLabel("Daily message limit:"), 3, 0)
+        config_layout.addWidget(QLabel("Daily message limit:"), 4, 0)
         self.daily_limit_spin = QSpinBox()
         self.daily_limit_spin.setRange(1, 50)
         self.daily_limit_spin.setValue(30)
         self.daily_limit_spin.setSuffix(" messages")
-        config_layout.addWidget(self.daily_limit_spin, 3, 1)
+        config_layout.addWidget(self.daily_limit_spin, 4, 1)
         
         # Minimum delay
-        config_layout.addWidget(QLabel("Minimum delay between messages:"), 4, 0)
+        config_layout.addWidget(QLabel("Minimum delay between messages:"), 5, 0)
         self.delay_spin = QSpinBox()
         self.delay_spin.setRange(30, 180)
         self.delay_spin.setValue(45)
         self.delay_spin.setSuffix(" seconds")
-        config_layout.addWidget(self.delay_spin, 4, 1)
+        config_layout.addWidget(self.delay_spin, 5, 1)
         
         # Help text
         help_text = QLabel(
@@ -233,7 +242,7 @@ class WhatsAppWebSettingsDialog(QDialog):
         )
         help_text.setStyleSheet("color: #666; font-style: italic;")
         help_text.setWordWrap(True)
-        config_layout.addWidget(help_text, 5, 0, 1, 2)
+        config_layout.addWidget(help_text, 6, 0, 1, 2)
         
         layout.addWidget(config_group)
     
@@ -341,6 +350,7 @@ class WhatsAppWebSettingsDialog(QDialog):
         # Load configuration values
         if self.service.is_configured():
             self.auto_send_checkbox.setChecked(self.service.auto_send)
+            self.auto_send_delay_spin.setValue(getattr(self.service, 'auto_send_delay', 5))
             self.rate_limit_spin.setValue(self.service.rate_limit_per_minute)
             self.daily_limit_spin.setValue(self.service.daily_message_limit)
             self.delay_spin.setValue(self.service.min_delay_seconds)
@@ -477,6 +487,7 @@ class WhatsAppWebSettingsDialog(QDialog):
             self.service.rate_limit_per_minute = self.rate_limit_spin.value()
             self.service.daily_message_limit = self.daily_limit_spin.value()
             self.service.min_delay_seconds = self.delay_spin.value()
+            self.service.auto_send_delay = self.auto_send_delay_spin.value()
             
             # Configure the service
             success, message = self.service.configure_service(
