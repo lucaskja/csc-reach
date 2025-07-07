@@ -25,9 +25,51 @@ This document describes the build and packaging process for creating distributab
 - Visual Studio Build Tools (for pywin32 compilation)
 - Code signing certificate (optional, for distribution)
 
+## Icon Creation
+
+The application uses a custom icon that needs to be converted to platform-specific formats:
+
+### Source Icon
+- **Location**: `assets/icons/messager.png`
+- **Format**: PNG with transparency
+- **Recommended Size**: 1024x1024 pixels minimum
+
+### Platform-Specific Formats
+- **macOS**: `.icns` format (created automatically)
+- **Windows**: `.ico` format (created automatically)
+
+### Automatic Icon Generation
+```bash
+# Create all platform-specific icons from PNG source
+python scripts/create_icons.py
+```
+
+This creates:
+- `assets/icons/messager.icns` - macOS icon bundle
+- `assets/icons/messager.ico` - Windows icon file
+
+The build scripts automatically run this step, so manual icon creation is usually not necessary.
+
 ## Build Process
 
-### macOS Build
+### Unified Build (Recommended)
+
+For the simplest build process, use the unified build script:
+
+```bash
+# Build for current platform with icons
+python scripts/build_all.py
+```
+
+This script automatically:
+- Creates platform-specific icons from the source PNG
+- Builds the application for the current platform
+- Creates distribution packages (DMG for macOS)
+- Provides clear output and error handling
+
+### Platform-Specific Builds
+
+#### macOS Build
 
 #### 1. Prepare Environment
 ```bash
@@ -36,6 +78,9 @@ source venv/bin/activate
 
 # Ensure all dependencies are installed
 pip install -e ".[dev]"
+
+# Create platform-specific icons (optional, done automatically)
+python scripts/create_icons.py
 ```
 
 #### 2. Build Application

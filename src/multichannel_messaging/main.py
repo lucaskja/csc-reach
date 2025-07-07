@@ -37,6 +37,27 @@ def main():
         # Set application properties
         app.setQuitOnLastWindowClosed(True)
         
+        # Set application icon
+        try:
+            icon_paths = [
+                # When running from source
+                Path(__file__).parent.parent.parent / "assets" / "icons" / "messager.png",
+                # When running from built app
+                Path(sys.executable).parent / "assets" / "icons" / "messager.png",
+                # Alternative paths
+                Path("assets/icons/messager.png"),
+            ]
+            
+            for icon_path in icon_paths:
+                if icon_path.exists():
+                    from PySide6.QtGui import QIcon
+                    icon = QIcon(str(icon_path))
+                    if not icon.isNull():
+                        app.setWindowIcon(icon)
+                        break
+        except Exception as e:
+            print(f"Warning: Could not set application icon: {e}")
+        
         # Initialize configuration
         try:
             config_manager = ConfigManager()

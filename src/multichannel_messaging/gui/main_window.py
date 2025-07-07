@@ -105,6 +105,9 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Multi-Channel Bulk Messaging System - Email MVP")
         self.setMinimumSize(1000, 700)
         
+        # Set window icon
+        self.set_window_icon()
+        
         # Create central widget
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -299,6 +302,33 @@ class MainWindow(QMainWindow):
         # Add permanent widgets to status bar
         self.quota_label = QLabel("Quota: 0/100")
         self.status_bar.addPermanentWidget(self.quota_label)
+    
+    def set_window_icon(self):
+        """Set the window icon."""
+        try:
+            # Try to find the icon file
+            icon_paths = [
+                # When running from source
+                Path(__file__).parent.parent.parent.parent / "assets" / "icons" / "messager.png",
+                # When running from built app
+                Path(sys.executable).parent / "assets" / "icons" / "messager.png",
+                # Alternative paths
+                Path("assets/icons/messager.png"),
+                Path("../assets/icons/messager.png"),
+            ]
+            
+            for icon_path in icon_paths:
+                if icon_path.exists():
+                    icon = QIcon(str(icon_path))
+                    if not icon.isNull():
+                        self.setWindowIcon(icon)
+                        logger.debug(f"Set window icon from: {icon_path}")
+                        return
+            
+            logger.warning("Could not find application icon")
+            
+        except Exception as e:
+            logger.warning(f"Failed to set window icon: {e}")
     
     def setup_services(self):
         """Set up external services."""
