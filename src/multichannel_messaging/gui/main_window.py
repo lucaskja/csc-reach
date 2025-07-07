@@ -18,7 +18,7 @@ from PySide6.QtGui import QAction, QFont, QIcon
 from ..core.config_manager import ConfigManager
 from ..core.csv_processor import CSVProcessor
 from ..core.models import Customer, MessageTemplate, MessageChannel
-from ..services.outlook_macos import OutlookMacOSService
+from ..services.email_service import EmailService
 from ..utils.logger import get_logger
 from ..utils.exceptions import CSVProcessingError, OutlookIntegrationError
 
@@ -32,11 +32,11 @@ class EmailSendingThread(QThread):
     email_sent = Signal(str, bool, str)  # email, success, message
     finished = Signal(bool, str)  # success, message
     
-    def __init__(self, customers: List[Customer], template: MessageTemplate, outlook_service: OutlookMacOSService):
+    def __init__(self, customers: List[Customer], template: MessageTemplate, email_service):
         super().__init__()
         self.customers = customers
         self.template = template
-        self.outlook_service = outlook_service
+        self.email_service = email_service
         self.should_stop = False
     
     def run(self):
@@ -51,7 +51,7 @@ class EmailSendingThread(QThread):
                     return
                 
                 try:
-                    success = self.outlook_service.send_email(customer, self.template)
+                    success = self.email_service.send_email(customer, self.template)
                     if success:
                         successful += 1
                         self.email_sent.emit(customer.email, True, "Sent successfully")
@@ -87,7 +87,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.config_manager = config_manager
         self.csv_processor = CSVProcessor()
-        self.outlook_service = None
+        self.email_service = None
         self.customers: List[Customer] = []
         self.current_template: Optional[MessageTemplate] = None
         self.sending_thread: Optional[EmailSendingThread] = None
@@ -303,14 +303,15 @@ class MainWindow(QMainWindow):
     def setup_services(self):
         """Set up external services."""
         try:
-            self.outlook_service = OutlookMacOSService()
-            self.outlook_status_label.setText("Outlook: Connected")
+            self.email_service = EmailService()
+            platform_info = self.email_service.get_platform_info()
+            self.outlook_status_label.setText(f"Outlook: Connected ({platform_info})")
             self.outlook_status_label.setStyleSheet("color: green;")
-            logger.info("Outlook service initialized successfully")
+            logger.info(f"Email service initialized successfully for {platform_info}")
         except Exception as e:
             self.outlook_status_label.setText("Outlook: Error")
             self.outlook_status_label.setStyleSheet("color: red;")
-            logger.error(f"Failed to initialize Outlook service: {e}")
+            logger.error(f"Failed to initialize email service: {e}")
             QMessageBox.warning(
                 self, 
                 "Outlook Connection Error", 
@@ -438,8 +439,8 @@ The Team""",
     
     def create_draft(self):
         """Create a draft email for the first selected customer."""
-        if not self.outlook_service:
-            QMessageBox.warning(self, "Service Error", "Outlook service is not available.")
+        if not self.email_service:
+            QMessageBox.warning(self, "Service Error", "Email service is not available.")
             return
         
         selected_customers = self.get_selected_customers()
@@ -455,7 +456,7 @@ The Team""",
         self.current_template.content = self.content_edit.toPlainText()
         
         try:
-            success = self.outlook_service.create_draft_email(customer, self.current_template)
+            success = self.email_service.create_draft_email(customer, self.current_template)
             if success:
                 QMessageBox.information(
                     self, 
@@ -471,17 +472,17 @@ The Team""",
     def update_send_button_state(self):
         """Update the send button enabled state."""
         selected_customers = self.get_selected_customers()
-        has_outlook = self.outlook_service is not None
+        has_email_service = self.email_service is not None
         not_sending = self.sending_thread is None or not self.sending_thread.isRunning()
         
-        self.send_btn.setEnabled(len(selected_customers) > 0 and has_outlook and not_sending)
-        self.draft_btn.setEnabled(len(selected_customers) > 0 and has_outlook and not_sending)
+        self.send_btn.setEnabled(len(selected_customers) > 0 and has_email_service and not_sending)
+        self.draft_btn.setEnabled(len(selected_customers) > 0 and has_email_service and not_sending)
         self.update_recipients_info()
     
     def send_emails(self):
         """Start sending emails."""
-        if not self.outlook_service:
-            QMessageBox.warning(self, "Service Error", "Outlook service is not available.")
+        if not self.email_service:
+            QMessageBox.warning(self, "Service Error", "Email service is not available.")
             return
         
         selected_customers = self.get_selected_customers()
@@ -505,7 +506,7 @@ The Team""",
             return
         
         # Start sending in background thread
-        self.sending_thread = EmailSendingThread(selected_customers, self.current_template, self.outlook_service)
+        self.sending_thread = EmailSendingThread(selected_customers, self.current_template, self.email_service)
         self.sending_thread.progress_updated.connect(self.update_progress)
         self.sending_thread.email_sent.connect(self.on_email_sent)
         self.sending_thread.finished.connect(self.on_sending_finished)
@@ -654,15 +655,16 @@ The Team""",
     
     def test_outlook_connection(self):
         """Test Outlook connection."""
-        if not self.outlook_service:
-            QMessageBox.warning(self, "Service Error", "Outlook service is not initialized.")
+        if not self.email_service:
+            QMessageBox.warning(self, "Service Error", "Email service is not initialized.")
             return
         
         try:
-            success, message = self.outlook_service.test_connection()
+            success, message = self.email_service.test_connection()
             if success:
-                QMessageBox.information(self, "Connection Test", f"Success: {message}")
-                self.outlook_status_label.setText("Outlook: Connected")
+                platform_info = self.email_service.get_platform_info()
+                QMessageBox.information(self, "Connection Test", f"Success: {message}\nPlatform: {platform_info}")
+                self.outlook_status_label.setText(f"Outlook: Connected ({platform_info})")
                 self.outlook_status_label.setStyleSheet("color: green;")
             else:
                 QMessageBox.warning(self, "Connection Test", f"Failed: {message}")
