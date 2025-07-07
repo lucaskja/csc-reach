@@ -21,9 +21,9 @@ from ..core.csv_processor import CSVProcessor
 from ..core.models import Customer, MessageTemplate, MessageChannel
 from ..services.email_service import EmailService
 from ..services.whatsapp_local_service import LocalWhatsAppBusinessService
-from ..services.pywhatkit_service import PyWhatKitService
+from ..services.whatsapp_web_service import WhatsAppWebService
 from ..gui.whatsapp_settings_dialog import WhatsAppSettingsDialog
-from ..gui.pywhatkit_settings_dialog import PyWhatKitSettingsDialog
+from ..gui.whatsapp_web_settings_dialog import WhatsAppWebSettingsDialog
 from ..utils.logger import get_logger
 from ..utils.exceptions import CSVProcessingError, OutlookIntegrationError
 
@@ -94,7 +94,7 @@ class MainWindow(QMainWindow):
         self.csv_processor = CSVProcessor()
         self.email_service = None
         self.whatsapp_service = LocalWhatsAppBusinessService()  # WhatsApp Business API service
-        self.pywhatkit_service = PyWhatKitService()  # PyWhatKit service (alternative)
+        self.whatsapp_web_service = WhatsAppWebService()  # WhatsApp Web service (no dependencies)
         self.customers: List[Customer] = []
         self.current_template: Optional[MessageTemplate] = None
         self.sending_thread: Optional[EmailSendingThread] = None
@@ -166,9 +166,9 @@ class MainWindow(QMainWindow):
         whatsapp_settings_action.triggered.connect(self.show_whatsapp_settings)
         tools_menu.addAction(whatsapp_settings_action)
         
-        pywhatkit_settings_action = QAction("WhatsApp PyWhatKit Settings...", self)
-        pywhatkit_settings_action.triggered.connect(self.show_pywhatkit_settings)
-        tools_menu.addAction(pywhatkit_settings_action)
+        whatsapp_web_settings_action = QAction("WhatsApp Web Settings...", self)
+        whatsapp_web_settings_action.triggered.connect(self.show_whatsapp_web_settings)
+        tools_menu.addAction(whatsapp_web_settings_action)
         
         tools_menu.addSeparator()
         
@@ -176,9 +176,9 @@ class MainWindow(QMainWindow):
         test_whatsapp_action.triggered.connect(self.test_whatsapp_connection)
         tools_menu.addAction(test_whatsapp_action)
         
-        test_pywhatkit_action = QAction("Test PyWhatKit Service", self)
-        test_pywhatkit_action.triggered.connect(self.test_pywhatkit_connection)
-        tools_menu.addAction(test_pywhatkit_action)
+        test_whatsapp_web_action = QAction("Test WhatsApp Web Service", self)
+        test_whatsapp_web_action.triggered.connect(self.test_whatsapp_web_connection)
+        tools_menu.addAction(test_whatsapp_web_action)
         
         # Help menu
         help_menu = menubar.addMenu("Help")
@@ -201,9 +201,9 @@ class MainWindow(QMainWindow):
         self.channel_combo.addItems([
             "Email Only", 
             "WhatsApp Business API", 
-            "WhatsApp (PyWhatKit)", 
+            "WhatsApp Web", 
             "Email + WhatsApp Business", 
-            "Email + WhatsApp (PyWhatKit)"
+            "Email + WhatsApp Web"
         ])
         self.channel_combo.setCurrentText("Email Only")  # Default to email for backward compatibility
         self.channel_combo.currentTextChanged.connect(self.on_channel_changed)
@@ -372,8 +372,8 @@ class MainWindow(QMainWindow):
         self.whatsapp_status_label = QLabel("WhatsApp Business: Not configured")
         self.status_bar.addPermanentWidget(self.whatsapp_status_label)
         
-        self.pywhatkit_status_label = QLabel("PyWhatKit: Not configured")
-        self.status_bar.addPermanentWidget(self.pywhatkit_status_label)
+        self.whatsapp_web_status_label = QLabel("WhatsApp Web: Not configured")
+        self.status_bar.addPermanentWidget(self.whatsapp_web_status_label)
         
         self.quota_label = QLabel("Quota: 0/100")
         self.status_bar.addPermanentWidget(self.quota_label)
@@ -769,7 +769,7 @@ CSC-Reach streamlines business communication processes with professional email t
         channel = self.channel_combo.currentText()
         if channel == "Email Only":
             self.send_btn.setText("Send Emails")
-        elif channel in ["WhatsApp Business API", "WhatsApp (PyWhatKit)"]:
+        elif channel in ["WhatsApp Business API", "WhatsApp Web"]:
             self.send_btn.setText("Send WhatsApp")
         else:
             self.send_btn.setText("Send Messages")
@@ -792,22 +792,19 @@ CSC-Reach streamlines business communication processes with professional email t
             self.whatsapp_status_label.setText("WhatsApp Business: Not configured")
             self.whatsapp_status_label.setStyleSheet("color: orange;")
         
-        # Update PyWhatKit status
-        if self.pywhatkit_service.is_configured():
-            usage = self.pywhatkit_service.get_daily_usage()
+        # Update WhatsApp Web status
+        if self.whatsapp_web_service.is_configured():
+            usage = self.whatsapp_web_service.get_daily_usage()
             remaining = usage['remaining_today']
             if remaining > 0:
-                self.pywhatkit_status_label.setText(f"PyWhatKit: Ready ({remaining} left)")
-                self.pywhatkit_status_label.setStyleSheet("color: green;")
+                self.whatsapp_web_status_label.setText(f"WhatsApp Web: Ready ({remaining} left)")
+                self.whatsapp_web_status_label.setStyleSheet("color: green;")
             else:
-                self.pywhatkit_status_label.setText("PyWhatKit: Daily limit reached")
-                self.pywhatkit_status_label.setStyleSheet("color: red;")
-        elif self.pywhatkit_service.is_available():
-            self.pywhatkit_status_label.setText("PyWhatKit: Not configured")
-            self.pywhatkit_status_label.setStyleSheet("color: orange;")
+                self.whatsapp_web_status_label.setText("WhatsApp Web: Daily limit reached")
+                self.whatsapp_web_status_label.setStyleSheet("color: red;")
         else:
-            self.pywhatkit_status_label.setText("PyWhatKit: Not installed")
-            self.pywhatkit_status_label.setStyleSheet("color: gray;")
+            self.whatsapp_web_status_label.setText("WhatsApp Web: Not configured")
+            self.whatsapp_web_status_label.setStyleSheet("color: orange;")
     
     def show_whatsapp_settings(self):
         """Show WhatsApp Business API settings dialog."""
@@ -824,21 +821,22 @@ CSC-Reach streamlines business communication processes with professional email t
                     "WhatsApp Business API has been configured successfully!"
                 )
     
-    def show_pywhatkit_settings(self):
-        """Show PyWhatKit settings dialog."""
-        dialog = PyWhatKitSettingsDialog(self)
+    def show_whatsapp_web_settings(self):
+        """Show WhatsApp Web settings dialog."""
+        dialog = WhatsAppWebSettingsDialog(self)
         if dialog.exec() == QDialog.Accepted:
-            # Refresh PyWhatKit service
-            self.pywhatkit_service = PyWhatKitService()
+            # Refresh WhatsApp Web service
+            self.whatsapp_web_service = WhatsAppWebService()
             self.update_status_display()
             
-            if self.pywhatkit_service.is_configured():
+            if self.whatsapp_web_service.is_configured():
                 QMessageBox.information(
                     self,
-                    "PyWhatKit Configured",
-                    "⚠️ PyWhatKit service has been configured.\n\n"
+                    "WhatsApp Web Configured",
+                    "⚠️ WhatsApp Web service has been configured.\n\n"
                     "Remember: Use at your own risk!\n"
-                    "WhatsApp Business API is the recommended approach."
+                    "WhatsApp Business API is the recommended approach.\n\n"
+                    "You will need to manually send each message in your browser."
                 )
     
     def test_whatsapp_connection(self):
@@ -864,33 +862,29 @@ CSC-Reach streamlines business communication processes with professional email t
         except Exception as e:
             QMessageBox.critical(self, "WhatsApp Business API Test", f"Test failed: {e}")
     
-    def test_pywhatkit_connection(self):
-        """Test PyWhatKit service."""
-        if not self.pywhatkit_service.is_available():
-            QMessageBox.warning(
-                self,
-                "PyWhatKit Not Available",
-                "PyWhatKit package is not installed.\n\nInstall with: pip install pywhatkit"
-            )
-            return
-        
-        if not self.pywhatkit_service.is_configured():
+    def test_whatsapp_web_connection(self):
+        """Test WhatsApp Web service."""
+        if not self.whatsapp_web_service.is_configured():
             QMessageBox.warning(
                 self, 
-                "PyWhatKit Not Configured", 
-                "Please configure PyWhatKit settings first.\n\nGo to Tools → WhatsApp PyWhatKit Settings to acknowledge risks and configure the service."
+                "WhatsApp Web Not Configured", 
+                "Please configure WhatsApp Web settings first.\n\nGo to Tools → WhatsApp Web Settings to acknowledge risks and configure the service."
             )
             return
         
         try:
-            success, message = self.pywhatkit_service.test_connection()
+            success, message = self.whatsapp_web_service.test_connection()
             if success:
-                QMessageBox.information(self, "PyWhatKit Service Test", f"✅ {message}")
+                QMessageBox.information(
+                    self, 
+                    "WhatsApp Web Service Test", 
+                    f"✅ {message}\n\nWhatsApp Web should have opened in your browser."
+                )
                 self.update_status_display()
             else:
-                QMessageBox.warning(self, "PyWhatKit Service Test", f"❌ {message}")
+                QMessageBox.warning(self, "WhatsApp Web Service Test", f"❌ {message}")
         except Exception as e:
-            QMessageBox.critical(self, "PyWhatKit Service Test", f"Test failed: {e}")
+            QMessageBox.critical(self, "WhatsApp Web Service Test", f"Test failed: {e}")
     
     def preview_message(self):
         """Preview message for selected channel(s)."""
@@ -911,7 +905,7 @@ CSC-Reach streamlines business communication processes with professional email t
         preview_text = ""
         
         # Email preview
-        if channel in ["Email Only", "Email + WhatsApp Business", "Email + WhatsApp (PyWhatKit)"]:
+        if channel in ["Email Only", "Email + WhatsApp Business", "Email + WhatsApp Web"]:
             preview_text += "📧 EMAIL PREVIEW:\n"
             preview_text += f"To: {customer.email}\n"
             preview_text += f"Subject: {rendered.get('subject', '')}\n\n"
@@ -919,15 +913,15 @@ CSC-Reach streamlines business communication processes with professional email t
             preview_text += "\n" + "="*50 + "\n\n"
         
         # WhatsApp preview
-        if channel in ["WhatsApp Business API", "WhatsApp (PyWhatKit)", "Email + WhatsApp Business", "Email + WhatsApp (PyWhatKit)"]:
-            service_type = "Business API" if "Business" in channel else "PyWhatKit"
+        if channel in ["WhatsApp Business API", "WhatsApp Web", "Email + WhatsApp Business", "Email + WhatsApp Web"]:
+            service_type = "Business API" if "Business" in channel else "Web Automation"
             preview_text += f"📱 WHATSAPP PREVIEW ({service_type}):\n"
             preview_text += f"To: {customer.phone}\n\n"
             whatsapp_content = rendered.get('whatsapp_content', rendered.get('content', ''))
             preview_text += whatsapp_content
             
-            if "PyWhatKit" in channel:
-                preview_text += "\n\n⚠️ WARNING: PyWhatKit uses browser automation"
+            if "Web" in channel:
+                preview_text += "\n\n⚠️ NOTE: WhatsApp Web will open in browser - you must manually send each message"
         
         # Show preview dialog
         dialog = QMessageBox(self)
@@ -954,7 +948,7 @@ CSC-Reach streamlines business communication processes with professional email t
         channel = self.channel_combo.currentText()
         
         # Validate channel availability
-        if channel in ["Email Only", "Email + WhatsApp Business", "Email + WhatsApp (PyWhatKit)"] and not self.email_service:
+        if channel in ["Email Only", "Email + WhatsApp Business", "Email + WhatsApp Web"] and not self.email_service:
             QMessageBox.warning(self, "Email Service Error", "Email service is not available.")
             return
         
@@ -966,33 +960,25 @@ CSC-Reach streamlines business communication processes with professional email t
             )
             return
         
-        if channel in ["WhatsApp (PyWhatKit)", "Email + WhatsApp (PyWhatKit)"]:
-            if not self.pywhatkit_service.is_available():
-                QMessageBox.warning(
-                    self,
-                    "PyWhatKit Not Available",
-                    "PyWhatKit package is not installed.\n\nInstall with: pip install pywhatkit"
-                )
-                return
-            
-            if not self.pywhatkit_service.is_configured():
+        if channel in ["WhatsApp Web", "Email + WhatsApp Web"]:
+            if not self.whatsapp_web_service.is_configured():
                 QMessageBox.warning(
                     self, 
-                    "PyWhatKit Not Configured", 
-                    "Please configure PyWhatKit settings first.\n\nGo to Tools → WhatsApp PyWhatKit Settings."
+                    "WhatsApp Web Not Configured", 
+                    "Please configure WhatsApp Web settings first.\n\nGo to Tools → WhatsApp Web Settings."
                 )
                 return
             
-            # Additional warning for PyWhatKit
+            # Additional warning for WhatsApp Web
             reply = QMessageBox.warning(
                 self,
-                "⚠️ PyWhatKit Warning",
-                "You are about to use PyWhatKit for WhatsApp messaging.\n\n"
-                "⚠️ RISKS:\n"
+                "⚠️ WhatsApp Web Warning",
+                "You are about to use WhatsApp Web automation.\n\n"
+                "⚠️ IMPORTANT:\n"
                 "• May violate WhatsApp Terms of Service\n"
                 "• Risk of account suspension\n"
-                "• Unreliable browser automation\n"
-                "• Not suitable for business use\n\n"
+                "• You must manually send each message in browser\n"
+                "• WhatsApp Web must be open and logged in\n\n"
                 "WhatsApp Business API is strongly recommended instead.\n\n"
                 "Do you want to proceed anyway?",
                 QMessageBox.Yes | QMessageBox.No,
@@ -1026,9 +1012,9 @@ CSC-Reach streamlines business communication processes with professional email t
         descriptions = {
             "Email Only": "email",
             "WhatsApp Business API": "WhatsApp Business API",
-            "WhatsApp (PyWhatKit)": "WhatsApp (PyWhatKit - browser automation)",
+            "WhatsApp Web": "WhatsApp Web (manual sending required)",
             "Email + WhatsApp Business": "email and WhatsApp Business API",
-            "Email + WhatsApp (PyWhatKit)": "email and WhatsApp (PyWhatKit)"
+            "Email + WhatsApp Web": "email and WhatsApp Web"
         }
         return descriptions.get(channel, channel.lower())
     
@@ -1038,12 +1024,12 @@ CSC-Reach streamlines business communication processes with professional email t
             self.start_email_sending(customers)
         elif channel == "WhatsApp Business API":
             self.start_whatsapp_business_sending(customers)
-        elif channel == "WhatsApp (PyWhatKit)":
-            self.start_pywhatkit_sending(customers)
+        elif channel == "WhatsApp Web":
+            self.start_whatsapp_web_sending(customers)
         elif channel == "Email + WhatsApp Business":
             self.start_email_and_whatsapp_business_sending(customers)
-        elif channel == "Email + WhatsApp (PyWhatKit)":
-            self.start_email_and_pywhatkit_sending(customers)
+        elif channel == "Email + WhatsApp Web":
+            self.start_email_and_whatsapp_web_sending(customers)
         else:
             QMessageBox.warning(self, "Unknown Channel", f"Unknown channel: {channel}")
     
@@ -1068,9 +1054,9 @@ CSC-Reach streamlines business communication processes with professional email t
         """Start WhatsApp Business API sending."""
         self._start_whatsapp_sending(customers, self.whatsapp_service, "WhatsApp Business API")
     
-    def start_pywhatkit_sending(self, customers: List[Customer]):
-        """Start PyWhatKit sending."""
-        self._start_whatsapp_sending(customers, self.pywhatkit_service, "PyWhatKit")
+    def start_whatsapp_web_sending(self, customers: List[Customer]):
+        """Start WhatsApp Web sending."""
+        self._start_whatsapp_sending(customers, self.whatsapp_web_service, "WhatsApp Web")
     
     def _start_whatsapp_sending(self, customers: List[Customer], service, service_name: str):
         """Generic WhatsApp sending method."""
@@ -1082,6 +1068,10 @@ CSC-Reach streamlines business communication processes with professional email t
         failed = 0
         
         self.log_message(f"Starting {service_name} sending to {len(customers)} recipients...")
+        
+        if service_name == "WhatsApp Web":
+            self.log_message("⚠️ WhatsApp Web will open in your browser for each recipient")
+            self.log_message("⚠️ You must manually click 'Send' for each message")
         
         for i, customer in enumerate(customers):
             # Check if customer has phone number
@@ -1095,7 +1085,10 @@ CSC-Reach streamlines business communication processes with professional email t
                 success = service.send_message(customer, self.current_template)
                 
                 if success:
-                    self.log_message(f"✅ {service_name} sent to {customer.name} ({customer.phone})")
+                    if service_name == "WhatsApp Web":
+                        self.log_message(f"🌐 WhatsApp Web opened for {customer.name} ({customer.phone}) - Please send manually")
+                    else:
+                        self.log_message(f"✅ {service_name} sent to {customer.name} ({customer.phone})")
                     successful += 1
                 else:
                     error = service.get_last_error() if hasattr(service, 'get_last_error') else "Unknown error"
@@ -1112,21 +1105,34 @@ CSC-Reach streamlines business communication processes with professional email t
             # Process events to keep UI responsive
             QApplication.processEvents()
             
-            # Add delay for PyWhatKit to prevent issues
-            if service_name == "PyWhatKit" and i < len(customers) - 1:
-                time.sleep(2)  # Small delay between messages
+            # Add delay between messages
+            if i < len(customers) - 1:
+                delay = service.min_delay_seconds if hasattr(service, 'min_delay_seconds') else 30
+                self.log_message(f"⏱️ Waiting {delay} seconds before next message...")
+                
+                # Show countdown
+                for remaining in range(delay, 0, -1):
+                    self.log_message(f"⏱️ {remaining} seconds remaining...")
+                    time.sleep(1)
+                    QApplication.processEvents()
         
         self.send_btn.setEnabled(True)
-        self.log_message(f"{service_name} sending completed: {successful} successful, {failed} failed")
+        
+        if service_name == "WhatsApp Web":
+            self.log_message(f"WhatsApp Web process completed: {successful} browser windows opened, {failed} failed")
+            self.log_message("⚠️ Remember to manually send each message in your browser!")
+        else:
+            self.log_message(f"{service_name} sending completed: {successful} successful, {failed} failed")
+        
         self.update_status_display()  # Refresh status after sending
     
     def start_email_and_whatsapp_business_sending(self, customers: List[Customer]):
         """Start sending via both email and WhatsApp Business API."""
         self._start_dual_channel_sending(customers, self.whatsapp_service, "WhatsApp Business API")
     
-    def start_email_and_pywhatkit_sending(self, customers: List[Customer]):
-        """Start sending via both email and PyWhatKit."""
-        self._start_dual_channel_sending(customers, self.pywhatkit_service, "PyWhatKit")
+    def start_email_and_whatsapp_web_sending(self, customers: List[Customer]):
+        """Start sending via both email and WhatsApp Web."""
+        self._start_dual_channel_sending(customers, self.whatsapp_web_service, "WhatsApp Web")
     
     def _start_dual_channel_sending(self, customers: List[Customer], whatsapp_service, whatsapp_service_name: str):
         """Generic dual-channel sending method."""
