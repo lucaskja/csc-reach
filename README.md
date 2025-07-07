@@ -1,12 +1,12 @@
-# Multi-Channel Bulk Messaging System
+# CSC-Reach - Email Communication Platform
 
 ## Overview
 
-The Multi-Channel Bulk Messaging System is a cross-platform desktop application designed to facilitate bulk messaging through email and WhatsApp channels. It processes customer data from CSV files, utilizes Outlook's mail merge functionality for emails, and integrates with WhatsApp Business API for instant messaging. The application runs locally on users' machines, available for both Windows and macOS platforms.
+CSC-Reach is a cross-platform desktop application designed to facilitate bulk email communication through Microsoft Outlook integration. It processes customer data from CSV files and utilizes Outlook's native functionality for professional email campaigns. The application runs locally on users' machines, available for both Windows and macOS platforms.
 
-This system caters to a multilingual user base in Brazil and Latin America, supporting Portuguese, Spanish, and English. It's designed to streamline communication processes for businesses needing to send mass communications efficiently and effectively.
+This system caters to businesses needing to streamline their email communication processes with professional templates, automated personalization, and real-time sending progress tracking.
 
-## 🎉 Current Status: Email MVP Completed
+## 🎉 Current Status: Email Platform Completed
 
 ### ✅ **Fully Implemented Features:**
 - **CSV Import & Processing**: Automatic column detection, encoding support, data validation
@@ -21,7 +21,7 @@ This system caters to a multilingual user base in Brazil and Latin America, supp
 - **Professional Branding**: Custom application icon and professional UI design
 
 ### 🚀 **Ready for Production Use:**
-The Email MVP is fully functional and ready for production use on both platforms:
+CSC-Reach is fully functional and ready for production use on both platforms:
 - **macOS**: Tested and packaged as `.app` bundle with `.dmg` installer
 - **Windows**: Complete implementation ready for testing and packaging
 
@@ -73,7 +73,7 @@ The Email MVP is fully functional and ready for production use on both platforms
 ### macOS
 
 #### Option 1: Download Pre-built App (Recommended)
-1. Download `MultiChannelMessaging-macOS.dmg` from the releases page
+1. Download `CSC-Reach-macOS.dmg` from the releases page
 2. Open the DMG file and drag the application to your Applications folder
 3. Right-click on the application and select "Open" to bypass macOS security restrictions on the first run
 
@@ -100,9 +100,9 @@ python scripts/create_dmg.py
 ### Windows
 
 #### Option 1: Download Pre-built Executable (Coming Soon)
-1. Download `MultiChannelMessaging-Windows.zip` from the releases page
+1. Download `CSC-Reach-Windows.zip` from the releases page
 2. Extract the ZIP file to your desired location
-3. Run `MultiChannelMessaging.exe`
+3. Run `CSC-Reach.exe`
 
 #### Option 2: Build from Source
 ```cmd
@@ -139,7 +139,7 @@ Ensure Outlook is installed and configured with your email account before using 
 ## Usage
 
 ### Basic Workflow
-1. **Launch** the Multi-Channel Bulk Messaging System application
+1. **Launch** the CSC-Reach application
 2. **Import CSV**: Click "Import CSV" and select your customer data file
    - Required columns: name, company, phone, email
    - Automatic column detection and mapping

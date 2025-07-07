@@ -12,7 +12,7 @@ from pathlib import Path
 
 def main():
     """Main build function."""
-    print("🚀 Building Multi-Channel Messaging System for macOS...")
+    print("🚀 Building CSC-Reach for macOS...")
     
     # Get project root
     project_root = Path(__file__).parent.parent
@@ -50,7 +50,7 @@ def main():
         return False
     
     # Check if app was created
-    app_path = project_root / 'dist' / 'MultiChannelMessaging.app'
+    app_path = project_root / 'dist' / 'CSC-Reach.app'
     if app_path.exists():
         print(f"✅ macOS app created successfully: {app_path}")
         
@@ -69,7 +69,7 @@ def main():
         try:
             # Just check if it can start (will exit quickly)
             test_result = subprocess.run([
-                str(app_path / 'Contents' / 'MacOS' / 'MultiChannelMessaging'),
+                str(app_path / 'Contents' / 'MacOS' / 'CSC-Reach'),
                 '--help'
             ], capture_output=True, text=True, timeout=10)
             

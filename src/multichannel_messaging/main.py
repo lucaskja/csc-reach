@@ -29,10 +29,10 @@ def main():
     try:
         # Create QApplication first
         app = QApplication(sys.argv)
-        app.setApplicationName("Multi-Channel Bulk Messaging System")
+        app.setApplicationName("CSC-Reach")
         app.setApplicationVersion("1.0.0")
-        app.setOrganizationName("Multi-Channel Messaging")
-        app.setOrganizationDomain("multichannelmessaging.com")
+        app.setOrganizationName("CSC-Reach")
+        app.setOrganizationDomain("csc-reach.com")
         
         # Set application properties
         app.setQuitOnLastWindowClosed(True)
@@ -110,7 +110,7 @@ def main():
             sys.exit(1)
         
         # Show startup message
-        logger.info("Multi-Channel Bulk Messaging System started successfully")
+        logger.info("CSC-Reach started successfully")
         
         # Run the application
         exit_code = app.exec()

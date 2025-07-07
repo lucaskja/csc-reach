@@ -11,14 +11,14 @@ from pathlib import Path
 
 def main():
     """Create DMG installer."""
-    print("📦 Creating DMG installer for macOS...")
+    print("📦 Creating DMG installer for CSC-Reach...")
     
     # Get project root
     project_root = Path(__file__).parent.parent
     os.chdir(project_root)
     
-    app_path = project_root / 'dist' / 'MultiChannelMessaging.app'
-    dmg_path = project_root / 'dist' / 'MultiChannelMessaging-macOS.dmg'
+    app_path = project_root / 'dist' / 'CSC-Reach.app'
+    dmg_path = project_root / 'dist' / 'CSC-Reach-macOS.dmg'
     
     if not app_path.exists():
         print("❌ App not found. Please build the app first.")
@@ -35,7 +35,7 @@ def main():
         # Use hdiutil to create DMG
         subprocess.run([
             'hdiutil', 'create',
-            '-volname', 'Multi-Channel Messaging',
+            '-volname', 'CSC-Reach',
             '-srcfolder', str(app_path),
             '-ov',
             '-format', 'UDZO',

@@ -13,8 +13,8 @@ from multichannel_messaging.utils.platform_utils import is_windows, is_macos
 
 def main():
     """Main build function."""
-    print("🚀 Multi-Channel Messaging System - Unified Build Script")
-    print("=" * 60)
+    print("🚀 CSC-Reach - Unified Build Script")
+    print("=" * 40)
     
     # Get project root
     project_root = Path(__file__).parent.parent
@@ -56,8 +56,8 @@ def main():
             print(f"⚠️  DMG creation failed: {e}")
         
         print("\n🎉 macOS build completed!")
-        print(f"📱 App: {project_root}/dist/MultiChannelMessaging.app")
-        print(f"💿 DMG: {project_root}/dist/MultiChannelMessaging-macOS.dmg")
+        print(f"📱 App: {project_root}/dist/CSC-Reach.app")
+        print(f"💿 DMG: {project_root}/dist/CSC-Reach-macOS.dmg")
         
     elif is_windows():
         print("🪟 Building for Windows...")
@@ -73,7 +73,7 @@ def main():
             return False
         
         print("\n🎉 Windows build completed!")
-        print(f"💻 Executable: {project_root}/dist/MultiChannelMessaging/MultiChannelMessaging.exe")
+        print(f"💻 Executable: {project_root}/dist/CSC-Reach/CSC-Reach.exe")
         
     else:
         print("❌ Unsupported platform for building")

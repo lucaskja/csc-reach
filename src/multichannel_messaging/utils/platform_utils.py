@@ -47,14 +47,14 @@ def get_app_data_dir() -> Path:
         Path to application data directory
     """
     if is_windows():
-        # Windows: %APPDATA%/MultiChannelMessaging
-        app_data = Path.home() / "AppData" / "Roaming" / "MultiChannelMessaging"
+        # Windows: %APPDATA%/CSC-Reach
+        app_data = Path.home() / "AppData" / "Roaming" / "CSC-Reach"
     elif is_macos():
-        # macOS: ~/Library/Application Support/MultiChannelMessaging
-        app_data = Path.home() / "Library" / "Application Support" / "MultiChannelMessaging"
+        # macOS: ~/Library/Application Support/CSC-Reach
+        app_data = Path.home() / "Library" / "Application Support" / "CSC-Reach"
     else:
-        # Linux: ~/.local/share/MultiChannelMessaging
-        app_data = Path.home() / ".local" / "share" / "MultiChannelMessaging"
+        # Linux: ~/.local/share/CSC-Reach
+        app_data = Path.home() / ".local" / "share" / "CSC-Reach"
     
     app_data.mkdir(parents=True, exist_ok=True)
     return app_data
@@ -68,14 +68,14 @@ def get_config_dir() -> Path:
         Path to configuration directory
     """
     if is_windows():
-        # Windows: %APPDATA%/MultiChannelMessaging
+        # Windows: %APPDATA%/CSC-Reach
         config_dir = get_app_data_dir()
     elif is_macos():
-        # macOS: ~/Library/Preferences/MultiChannelMessaging
-        config_dir = Path.home() / "Library" / "Preferences" / "MultiChannelMessaging"
+        # macOS: ~/Library/Preferences/CSC-Reach
+        config_dir = Path.home() / "Library" / "Preferences" / "CSC-Reach"
     else:
-        # Linux: ~/.config/MultiChannelMessaging
-        config_dir = Path.home() / ".config" / "MultiChannelMessaging"
+        # Linux: ~/.config/CSC-Reach
+        config_dir = Path.home() / ".config" / "CSC-Reach"
     
     config_dir.mkdir(parents=True, exist_ok=True)
     return config_dir
@@ -89,13 +89,13 @@ def get_logs_dir() -> Path:
         Path to logs directory
     """
     if is_windows():
-        # Windows: %APPDATA%/MultiChannelMessaging/logs
+        # Windows: %APPDATA%/CSC-Reach/logs
         logs_dir = get_app_data_dir() / "logs"
     elif is_macos():
-        # macOS: ~/Library/Logs/MultiChannelMessaging
-        logs_dir = Path.home() / "Library" / "Logs" / "MultiChannelMessaging"
+        # macOS: ~/Library/Logs/CSC-Reach
+        logs_dir = Path.home() / "Library" / "Logs" / "CSC-Reach"
     else:
-        # Linux: ~/.local/share/MultiChannelMessaging/logs
+        # Linux: ~/.local/share/CSC-Reach/logs
         logs_dir = get_app_data_dir() / "logs"
     
     logs_dir.mkdir(parents=True, exist_ok=True)

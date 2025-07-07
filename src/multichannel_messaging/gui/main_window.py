@@ -102,7 +102,7 @@ class MainWindow(QMainWindow):
     
     def setup_ui(self):
         """Set up the user interface."""
-        self.setWindowTitle("Multi-Channel Bulk Messaging System - Email MVP")
+        self.setWindowTitle("CSC-Reach - Email Communication Platform")
         self.setMinimumSize(1000, 700)
         
         # Set window icon
@@ -707,16 +707,16 @@ The Team""",
         """Show about dialog."""
         QMessageBox.about(
             self,
-            "About Multi-Channel Bulk Messaging System",
-            """Multi-Channel Bulk Messaging System - Email MVP
+            "About CSC-Reach",
+            """CSC-Reach - Email Communication Platform
             
 Version 1.0.0
 
-A cross-platform desktop application for bulk messaging through email and WhatsApp.
+A cross-platform desktop application for bulk email communication through Microsoft Outlook integration.
 
-This MVP version focuses on email functionality using Microsoft Outlook integration.
+CSC-Reach streamlines business communication processes with professional email templates, CSV data processing, and real-time sending progress.
 
-© 2024 Multi-Channel Messaging Team"""
+© 2024 CSC-Reach Team"""
         )
     
     def closeEvent(self, event):

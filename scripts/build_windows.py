@@ -12,7 +12,7 @@ from pathlib import Path
 
 def main():
     """Main build function."""
-    print("🚀 Building Multi-Channel Messaging System for Windows...")
+    print("🚀 Building CSC-Reach for Windows...")
     
     # Get project root
     project_root = Path(__file__).parent.parent
@@ -50,7 +50,7 @@ def main():
         return False
     
     # Check if executable was created
-    exe_path = project_root / 'dist' / 'MultiChannelMessaging' / 'MultiChannelMessaging.exe'
+    exe_path = project_root / 'dist' / 'CSC-Reach' / 'CSC-Reach.exe'
     if exe_path.exists():
         print(f"✅ Windows executable created successfully: {exe_path}")
         
