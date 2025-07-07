@@ -170,6 +170,11 @@ class MainWindow(QMainWindow):
         self.send_btn.setEnabled(False)
         toolbar_layout.addWidget(self.send_btn)
         
+        self.draft_btn = QPushButton("Create Draft")
+        self.draft_btn.clicked.connect(self.create_draft)
+        self.draft_btn.setEnabled(False)
+        toolbar_layout.addWidget(self.draft_btn)
+        
         self.stop_btn = QPushButton("Stop Sending")
         self.stop_btn.clicked.connect(self.stop_sending)
         self.stop_btn.setEnabled(False)
@@ -431,6 +436,38 @@ The Team""",
                 selected.append(customer)
         return selected
     
+    def create_draft(self):
+        """Create a draft email for the first selected customer."""
+        if not self.outlook_service:
+            QMessageBox.warning(self, "Service Error", "Outlook service is not available.")
+            return
+        
+        selected_customers = self.get_selected_customers()
+        if not selected_customers:
+            QMessageBox.information(self, "No Recipients", "Please select at least one recipient.")
+            return
+        
+        # Use first selected customer for draft
+        customer = selected_customers[0]
+        
+        # Update template with current content
+        self.current_template.subject = self.subject_edit.toPlainText()
+        self.current_template.content = self.content_edit.toPlainText()
+        
+        try:
+            success = self.outlook_service.create_draft_email(customer, self.current_template)
+            if success:
+                QMessageBox.information(
+                    self, 
+                    "Draft Created", 
+                    f"Draft email created for {customer.name} ({customer.email})\n\nCheck your Outlook drafts folder."
+                )
+                self.log_message(f"Draft email created for {customer.email}")
+            else:
+                QMessageBox.warning(self, "Draft Failed", "Failed to create draft email.")
+        except Exception as e:
+            QMessageBox.critical(self, "Draft Error", f"Failed to create draft email:\n{e}")
+    
     def update_send_button_state(self):
         """Update the send button enabled state."""
         selected_customers = self.get_selected_customers()
@@ -438,6 +475,7 @@ The Team""",
         not_sending = self.sending_thread is None or not self.sending_thread.isRunning()
         
         self.send_btn.setEnabled(len(selected_customers) > 0 and has_outlook and not_sending)
+        self.draft_btn.setEnabled(len(selected_customers) > 0 and has_outlook and not_sending)
         self.update_recipients_info()
     
     def send_emails(self):
@@ -476,6 +514,7 @@ The Team""",
         
         # Update UI state
         self.send_btn.setEnabled(False)
+        self.draft_btn.setEnabled(False)
         self.stop_btn.setEnabled(True)
         self.progress_bar.setMaximum(len(selected_customers))
         self.progress_bar.setValue(0)
@@ -502,6 +541,7 @@ The Team""",
     def on_sending_finished(self, success: bool, message: str):
         """Handle sending finished event."""
         self.send_btn.setEnabled(True)
+        self.draft_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
         self.progress_label.setText("Sending completed")
         
@@ -537,29 +577,57 @@ The Team""",
         subject = rendered.get('subject', '')
         content = rendered.get('content', '')
         
-        # Convert content to HTML for better display
-        html_content = self._convert_text_to_html(content)
+        # Create a custom dialog for better control over styling
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton, QLabel
         
-        # Create preview dialog
-        preview_dialog = QMessageBox(self)
-        preview_dialog.setWindowTitle("Email Preview")
-        preview_dialog.setTextFormat(Qt.RichText)
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Email Preview")
+        dialog.setMinimumSize(600, 400)
         
-        preview_text = f"""
-        <h3>Subject:</h3>
-        <p><strong>{subject}</strong></p>
+        layout = QVBoxLayout(dialog)
         
-        <h3>Content:</h3>
-        <div style="border: 1px solid #ccc; padding: 10px; background-color: #f9f9f9;">
-        {html_content}
-        </div>
+        # Subject section
+        subject_label = QLabel("Subject:")
+        subject_label.setStyleSheet("font-weight: bold; margin-top: 10px;")
+        layout.addWidget(subject_label)
         
-        <p><em>Preview using: {sample_customer.name} ({sample_customer.email})</em></p>
-        """
+        subject_display = QLabel(subject)
+        subject_display.setStyleSheet("padding: 5px; border: 1px solid #ccc; background-color: #f9f9f9; margin-bottom: 10px;")
+        subject_display.setWordWrap(True)
+        layout.addWidget(subject_display)
         
-        preview_dialog.setText(preview_text)
-        preview_dialog.setStandardButtons(QMessageBox.Ok)
-        preview_dialog.exec()
+        # Content section
+        content_label = QLabel("Content:")
+        content_label.setStyleSheet("font-weight: bold;")
+        layout.addWidget(content_label)
+        
+        content_display = QTextEdit()
+        content_display.setPlainText(content)
+        content_display.setReadOnly(True)
+        content_display.setStyleSheet("""
+            QTextEdit {
+                border: 1px solid #ccc;
+                background-color: white;
+                color: black;
+                padding: 10px;
+                font-family: Arial, sans-serif;
+                font-size: 12px;
+                line-height: 1.4;
+            }
+        """)
+        layout.addWidget(content_display)
+        
+        # Sample info
+        info_label = QLabel(f"Preview using: {sample_customer.name} ({sample_customer.email})")
+        info_label.setStyleSheet("font-style: italic; color: #666; margin-top: 10px;")
+        layout.addWidget(info_label)
+        
+        # Close button
+        close_button = QPushButton("Close")
+        close_button.clicked.connect(dialog.accept)
+        layout.addWidget(close_button)
+        
+        dialog.exec()
     
     def _convert_text_to_html(self, text: str) -> str:
         """Convert plain text to HTML for display."""

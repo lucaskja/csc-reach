@@ -126,14 +126,57 @@ class OutlookMacOSService:
         if not text:
             return ""
         
-        # Normalize line endings to \n
+        # Normalize line endings to \n first
         formatted = text.replace('\r\n', '\n').replace('\r', '\n')
         
-        # Ensure we have proper line breaks for AppleScript
-        # AppleScript uses \r for line breaks in strings
-        formatted = formatted.replace('\n', '\r')
-        
+        # For AppleScript, we need to use the return character constant
+        # Instead of literal \r, we'll use AppleScript's return constant
         return formatted
+    
+    def _build_email_script(self, subject: str, content: str, email: str, send: bool = True) -> str:
+        """
+        Build AppleScript for creating/sending email with proper line break handling.
+        
+        Args:
+            subject: Email subject
+            content: Email content with line breaks
+            email: Recipient email address
+            send: Whether to send the email or just create draft
+            
+        Returns:
+            AppleScript code
+        """
+        # Escape basic characters for AppleScript strings
+        subject_escaped = self._escape_for_applescript(subject)
+        email_escaped = self._escape_for_applescript(email)
+        
+        # For content, we'll use a different approach - build it line by line in AppleScript
+        lines = content.split('\n')
+        
+        # Create AppleScript that builds the content with proper returns
+        content_lines = []
+        for line in lines:
+            escaped_line = self._escape_for_applescript(line)
+            content_lines.append(f'"{escaped_line}"')
+        
+        # Join lines with AppleScript's return character
+        content_script = ' & return & '.join(content_lines)
+        
+        # Build the complete AppleScript
+        action = "send newMessage" if send else "open newMessage"
+        
+        script = f'''
+        tell application "Microsoft Outlook"
+            set emailContent to {content_script}
+            set newMessage to make new outgoing message
+            set subject of newMessage to "{subject_escaped}"
+            set content of newMessage to emailContent
+            make new recipient at newMessage with properties {{email address:{{address:"{email_escaped}"}}}}
+            {action}
+        end tell
+        '''
+        
+        return script
     
     def _escape_for_applescript(self, text: str) -> str:
         """
@@ -268,22 +311,11 @@ class OutlookMacOSService:
             subject = rendered.get('subject', '')
             content = rendered.get('content', '')
             
-            # Ensure proper line breaks in content
+            # Format content for AppleScript
             formatted_content = self._format_plain_text(content)
             
-            # Escape quotes and special characters for AppleScript
-            subject_escaped = self._escape_for_applescript(subject)
-            content_escaped = self._escape_for_applescript(formatted_content)
-            email_escaped = self._escape_for_applescript(customer.email)
-            
-            # Create and send email using AppleScript with plain text
-            script = f'''
-            tell application "Microsoft Outlook"
-                set newMessage to make new outgoing message with properties {{subject:"{subject_escaped}", content:"{content_escaped}"}}
-                make new recipient at newMessage with properties {{email address:{{address:"{email_escaped}"}}}}
-                send newMessage
-            end tell
-            '''
+            # Build AppleScript with proper line break handling
+            script = self._build_email_script(subject, formatted_content, customer.email, send=True)
             
             self._run_applescript(script)
             logger.info(f"Email sent to {customer.email}")
@@ -392,22 +424,11 @@ class OutlookMacOSService:
             subject = rendered.get('subject', '')
             content = rendered.get('content', '')
             
-            # Ensure proper line breaks in content
+            # Format content for AppleScript
             formatted_content = self._format_plain_text(content)
             
-            # Escape quotes and special characters for AppleScript
-            subject_escaped = self._escape_for_applescript(subject)
-            content_escaped = self._escape_for_applescript(formatted_content)
-            email_escaped = self._escape_for_applescript(customer.email)
-            
-            # Create draft email using AppleScript
-            script = f'''
-            tell application "Microsoft Outlook"
-                set newMessage to make new outgoing message with properties {{subject:"{subject_escaped}", content:"{content_escaped}"}}
-                make new recipient at newMessage with properties {{email address:{{address:"{email_escaped}"}}}}
-                open newMessage
-            end tell
-            '''
+            # Build AppleScript with proper line break handling
+            script = self._build_email_script(subject, formatted_content, customer.email, send=False)
             
             self._run_applescript(script)
             logger.info(f"Draft email created for {customer.email}")
@@ -416,6 +437,31 @@ class OutlookMacOSService:
         except Exception as e:
             logger.error(f"Failed to create draft email for {customer.email}: {e}")
             return False
+    
+    def test_email_formatting(self, customer: Customer, template: MessageTemplate) -> str:
+        """
+        Test email formatting by generating the AppleScript without executing it.
+        
+        Args:
+            customer: Customer for the email
+            template: Email template to use
+            
+        Returns:
+            Generated AppleScript code
+        """
+        # Render template
+        rendered = template.render(customer)
+        subject = rendered.get('subject', '')
+        content = rendered.get('content', '')
+        
+        # Format content for AppleScript
+        formatted_content = self._format_plain_text(content)
+        
+        # Build AppleScript
+        script = self._build_email_script(subject, formatted_content, customer.email, send=False)
+        
+        logger.info(f"Generated AppleScript:\n{script}")
+        return script
     
     def get_outlook_version(self) -> Optional[str]:
         """
