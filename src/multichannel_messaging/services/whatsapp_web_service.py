@@ -372,6 +372,10 @@ class WhatsAppWebService:
                 logger.info("🔧 JavaScript failed, trying platform-specific automation...")
                 if system == "darwin":  # macOS
                     success = self._auto_send_macos()
+                    # If mouse click method failed, try simple Enter key method
+                    if not success:
+                        logger.info("🔧 Mouse click method failed, trying simple Enter key...")
+                        success = self._auto_send_macos_simple()
                 elif system == "windows":  # Windows
                     success = self._auto_send_windows()
                 elif system == "linux":  # Linux
@@ -589,7 +593,10 @@ class WhatsAppWebService:
                 if (count of windows) > 0 then
                     repeat with w from 1 to count of windows
                         repeat with t from 1 to count of tabs of window w
-                            if title of tab t of window w contains "WhatsApp" then
+                            set tabTitle to title of tab t of window w
+                            set tabURL to URL of tab t of window w
+                            -- Check for WhatsApp in title or URL
+                            if tabTitle contains "WhatsApp" or tabURL contains "web.whatsapp.com" then
                                 set active tab index of window w to t
                                 set index of window w to 1
                                 activate
@@ -620,12 +627,12 @@ class WhatsAppWebService:
                                         delay 0.2
                                     end tell
                                 end tell
-                                return true
+                                return "SUCCESS"
                             end if
                         end repeat
                     end repeat
                 end if
-                return false
+                return "NO_WHATSAPP_TAB"
             end tell
             '''
             
@@ -636,21 +643,85 @@ class WhatsAppWebService:
                 timeout=15
             )
             
-            success = result.returncode == 0 and "true" in result.stdout.lower()
+            success = result.returncode == 0 and "SUCCESS" in result.stdout
+            
+            # Enhanced logging for debugging
             if success:
                 logger.info("✅ macOS mouse click + Enter auto-send successful")
             else:
                 logger.warning(f"⚠️ macOS mouse click + Enter auto-send failed")
-                if result.stderr:
-                    logger.debug(f"AppleScript error: {result.stderr}")
+                logger.debug(f"AppleScript return code: {result.returncode}")
+                logger.debug(f"AppleScript stdout: {result.stdout}")
+                logger.debug(f"AppleScript stderr: {result.stderr}")
+                
+                # Provide specific guidance based on the error
+                if "NO_WHATSAPP_TAB" in result.stdout:
+                    logger.info("💡 No WhatsApp tab found - make sure WhatsApp Web is open in Chrome")
+                elif result.stderr:
+                    if "process \"Google Chrome\" doesn't understand" in result.stderr:
+                        logger.info("💡 Chrome accessibility issue - try enabling System Preferences > Security & Privacy > Accessibility > Terminal")
+                    elif "not allowed assistive access" in result.stderr:
+                        logger.info("💡 Enable accessibility access: System Preferences > Security & Privacy > Privacy > Accessibility")
+                    else:
+                        logger.info(f"💡 AppleScript error: {result.stderr}")
             
             return success
             
         except subprocess.TimeoutExpired:
             logger.error("macOS auto-send timed out")
+            logger.info("💡 Try reducing auto-send delay or check if Chrome is responding")
             return False
         except Exception as e:
             logger.error(f"macOS auto-send failed: {e}")
+            return False
+    
+    def _auto_send_macos_simple(self) -> bool:
+        """Simple macOS auto-send using just Enter key after focusing Chrome."""
+        try:
+            # Much simpler AppleScript that just focuses Chrome and sends Enter
+            applescript = '''
+            tell application "Google Chrome"
+                if (count of windows) > 0 then
+                    repeat with w from 1 to count of windows
+                        repeat with t from 1 to count of tabs of window w
+                            set tabTitle to title of tab t of window w
+                            set tabURL to URL of tab t of window w
+                            -- Check for WhatsApp in title or URL
+                            if tabTitle contains "WhatsApp" or tabURL contains "web.whatsapp.com" then
+                                set active tab index of window w to t
+                                set index of window w to 1
+                                activate
+                                delay 1
+                                tell application "System Events"
+                                    key code 36 -- Enter key
+                                end tell
+                                return "SUCCESS"
+                            end if
+                        end repeat
+                    end repeat
+                end if
+                return "NO_WHATSAPP_TAB"
+            end tell
+            '''
+            
+            result = subprocess.run(
+                ["osascript", "-e", applescript],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            success = result.returncode == 0 and "SUCCESS" in result.stdout
+            
+            if success:
+                logger.info("✅ macOS simple Enter auto-send successful")
+            else:
+                logger.debug(f"Simple auto-send failed: {result.stdout} | {result.stderr}")
+            
+            return success
+            
+        except Exception as e:
+            logger.debug(f"Simple macOS auto-send failed: {e}")
             return False
     
     def _auto_send_windows(self) -> bool:
