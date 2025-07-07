@@ -1090,6 +1090,60 @@ class WhatsAppWebService:
         except Exception as e:
             logger.error(f"Failed to check Chrome availability: {e}")
             return False, f"Error checking Chrome: {e}"
+        """
+        Check if Chrome is available on the system.
+        
+        Returns:
+            Tuple of (is_available, chrome_path_or_command)
+        """
+        try:
+            system = platform.system().lower()
+            
+            if system == "darwin":  # macOS
+                # Check if Chrome is installed
+                result = subprocess.run([
+                    "mdfind", "kMDItemCFBundleIdentifier == 'com.google.Chrome'"
+                ], capture_output=True, text=True, timeout=5)
+                
+                if result.returncode == 0 and result.stdout.strip():
+                    return True, "Google Chrome"
+                else:
+                    return False, "Chrome not found on macOS"
+                    
+            elif system == "windows":  # Windows
+                # Check common Chrome installation paths
+                chrome_paths = [
+                    r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+                    r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+                    os.path.expanduser(r"~\AppData\Local\Google\Chrome\Application\chrome.exe")
+                ]
+                
+                for chrome_path in chrome_paths:
+                    if os.path.exists(chrome_path):
+                        return True, chrome_path
+                
+                return False, "Chrome not found on Windows"
+                
+            else:  # Linux
+                # Check for Chrome variants
+                chrome_commands = ["google-chrome", "google-chrome-stable", "chromium-browser", "chromium"]
+                
+                for chrome_cmd in chrome_commands:
+                    try:
+                        result = subprocess.run([
+                            "which", chrome_cmd
+                        ], capture_output=True, text=True, timeout=5)
+                        
+                        if result.returncode == 0:
+                            return True, chrome_cmd
+                    except FileNotFoundError:
+                        continue
+                
+                return False, "Chrome not found on Linux"
+                
+        except Exception as e:
+            logger.error(f"Failed to check Chrome availability: {e}")
+            return False, f"Error checking Chrome: {e}"
 
     def _create_whatsapp_url(self, phone: str, message: str) -> str:
         """
