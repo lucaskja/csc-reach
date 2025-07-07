@@ -254,14 +254,24 @@ class WhatsAppWebSettingsDialog(QDialog):
         # Checkboxes for acknowledgment
         self.ack_tos = QCheckBox("I understand this may violate WhatsApp's Terms of Service")
         self.ack_ban = QCheckBox("I accept the risk of account suspension or ban")
-        self.ack_manual = QCheckBox("I understand I must manually send each message")
+        self.ack_manual = QCheckBox("I understand I must manually send each message (unless auto-send is enabled)")
         self.ack_alternative = QCheckBox("I acknowledge that WhatsApp Business API is the recommended alternative")
         self.ack_responsibility = QCheckBox("I take full responsibility for any consequences")
+        
+        # Auto-send specific acknowledgment
+        self.ack_auto_send = QCheckBox("I understand automatic sending significantly increases risks")
+        self.ack_auto_send.setStyleSheet("QCheckBox { color: #d32f2f; font-weight: bold; }")
         
         for checkbox in [self.ack_tos, self.ack_ban, self.ack_manual, 
                         self.ack_alternative, self.ack_responsibility]:
             checkbox.setStyleSheet("QCheckBox { color: #e65100; font-weight: bold; }")
             ack_layout.addWidget(checkbox)
+        
+        # Add auto-send acknowledgment
+        ack_layout.addWidget(self.ack_auto_send)
+        
+        # Connect auto-send checkbox to show/hide auto-send acknowledgment
+        self.auto_send_checkbox.toggled.connect(self.on_auto_send_toggled)
         
         # Final confirmation
         separator = QFrame()
@@ -312,8 +322,16 @@ class WhatsAppWebSettingsDialog(QDialog):
         
         # Connect acknowledgment checkboxes to enable/disable save button
         for checkbox in [self.ack_tos, self.ack_ban, self.ack_manual, 
-                        self.ack_alternative, self.ack_responsibility, self.final_ack]:
+                        self.ack_alternative, self.ack_responsibility, self.ack_auto_send, self.final_ack]:
             checkbox.toggled.connect(self.update_save_button)
+    
+    def on_auto_send_toggled(self, checked: bool):
+        """Handle auto-send checkbox toggle."""
+        # Show/hide auto-send acknowledgment based on auto-send checkbox
+        self.ack_auto_send.setVisible(checked)
+        if not checked:
+            self.ack_auto_send.setChecked(False)
+        self.update_save_button()
     
     def load_current_settings(self):
         """Load current service settings."""
@@ -351,7 +369,7 @@ class WhatsAppWebSettingsDialog(QDialog):
     
     def update_save_button(self):
         """Update save button state based on acknowledgments."""
-        all_checked = all([
+        basic_checks = all([
             self.ack_tos.isChecked(),
             self.ack_ban.isChecked(),
             self.ack_manual.isChecked(),
@@ -360,7 +378,12 @@ class WhatsAppWebSettingsDialog(QDialog):
             self.final_ack.isChecked()
         ])
         
-        self.save_btn.setEnabled(all_checked)
+        # If auto-send is enabled, require auto-send acknowledgment too
+        auto_send_check = True
+        if self.auto_send_checkbox.isChecked():
+            auto_send_check = self.ack_auto_send.isChecked()
+        
+        self.save_btn.setEnabled(basic_checks and auto_send_check)
     
     def test_service(self):
         """Test the WhatsApp Web service."""
@@ -403,24 +426,34 @@ class WhatsAppWebSettingsDialog(QDialog):
     
     def save_settings(self):
         """Save the service settings."""
-        if not all([
+        basic_acknowledgments = all([
             self.ack_tos.isChecked(),
             self.ack_ban.isChecked(),
             self.ack_manual.isChecked(),
             self.ack_alternative.isChecked(),
             self.ack_responsibility.isChecked(),
             self.final_ack.isChecked()
-        ]):
+        ])
+        
+        if not basic_acknowledgments:
             QMessageBox.warning(
                 self,
                 "Acknowledgment Required",
-                "You must acknowledge all risks before proceeding."
+                "You must acknowledge all basic risks before proceeding."
             )
             return
         
         # Additional warning for auto-send
         auto_send_enabled = self.auto_send_checkbox.isChecked()
         if auto_send_enabled:
+            if not self.ack_auto_send.isChecked():
+                QMessageBox.warning(
+                    self,
+                    "Auto-Send Acknowledgment Required",
+                    "You must acknowledge the additional risks of automatic sending."
+                )
+                return
+            
             reply = QMessageBox.warning(
                 self,
                 "⚠️ AUTOMATIC SENDING WARNING",

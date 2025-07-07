@@ -26,6 +26,7 @@ from ..services.whatsapp_web_service import WhatsAppWebService
 from ..gui.whatsapp_settings_dialog import WhatsAppSettingsDialog
 from ..gui.whatsapp_web_settings_dialog import WhatsAppWebSettingsDialog
 from ..gui.language_settings_dialog import LanguageSettingsDialog
+from ..gui.preview_dialog import PreviewDialog
 from ..core.i18n_manager import get_i18n_manager, tr
 from ..utils.logger import get_logger
 from ..utils.exceptions import CSVProcessingError, OutlookIntegrationError
@@ -197,32 +198,32 @@ class MainWindow(QMainWindow):
         """Create the toolbar."""
         toolbar_layout = QHBoxLayout()
         
-        self.import_btn = QPushButton("Import CSV")
+        self.import_btn = QPushButton(tr("import_csv"))
         self.import_btn.clicked.connect(self.import_csv)
         toolbar_layout.addWidget(self.import_btn)
         
         # Channel selection
-        toolbar_layout.addWidget(QLabel("Send via:"))
+        toolbar_layout.addWidget(QLabel(tr("send_via")))
         self.channel_combo = QComboBox()
         self.channel_combo.addItems([
-            "Email Only", 
-            "WhatsApp Business API", 
-            "WhatsApp Web", 
-            "Email + WhatsApp Business", 
-            "Email + WhatsApp Web"
+            tr("email_only"), 
+            tr("whatsapp_business_api"), 
+            tr("whatsapp_web"), 
+            tr("email_whatsapp_business"), 
+            tr("email_whatsapp_web")
         ])
-        self.channel_combo.setCurrentText("Email Only")  # Default to email for backward compatibility
+        self.channel_combo.setCurrentText(tr("email_only"))  # Default to email for backward compatibility
         self.channel_combo.currentTextChanged.connect(self.on_channel_changed)
         toolbar_layout.addWidget(self.channel_combo)
         
         toolbar_layout.addWidget(QFrame())  # Separator
         
-        self.send_btn = QPushButton("Send Messages")
+        self.send_btn = QPushButton(tr("send_messages"))
         self.send_btn.clicked.connect(self.send_messages)
         self.send_btn.setEnabled(False)
         toolbar_layout.addWidget(self.send_btn)
         
-        self.draft_btn = QPushButton("Create Draft")
+        self.draft_btn = QPushButton(tr("create_draft"))
         self.draft_btn.clicked.connect(self.create_draft)
         self.draft_btn.setEnabled(False)
         toolbar_layout.addWidget(self.draft_btn)
@@ -233,6 +234,15 @@ class MainWindow(QMainWindow):
         toolbar_layout.addWidget(self.stop_btn)
         
         toolbar_layout.addStretch()
+        
+        # Language selector
+        toolbar_layout.addWidget(QLabel(tr("language") + ":"))
+        self.language_combo = QComboBox()
+        self.populate_language_combo()
+        self.language_combo.currentTextChanged.connect(self.on_language_changed)
+        toolbar_layout.addWidget(self.language_combo)
+        
+        toolbar_layout.addWidget(QFrame())  # Separator
         
         # Status indicators
         self.outlook_status_label = QLabel("Outlook: Not Connected")
@@ -260,7 +270,7 @@ class MainWindow(QMainWindow):
     
     def create_recipients_panel(self) -> QWidget:
         """Create the recipients panel."""
-        panel = QGroupBox("Recipients")
+        panel = QGroupBox(tr("recipients"))
         layout = QVBoxLayout(panel)
         
         # Recipients list
@@ -269,7 +279,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.recipients_list)
         
         # Recipients info
-        self.recipients_info_label = QLabel("No recipients loaded")
+        self.recipients_info_label = QLabel(tr("no_recipients_loaded"))
         layout.addWidget(self.recipients_info_label)
         
         # Select all/none buttons
@@ -870,6 +880,38 @@ CSC-Reach streamlines business communication processes with professional email t
         # For now, just update the window title
         self.setWindowTitle(tr("app_title"))
     
+    def populate_language_combo(self):
+        """Populate the language combo box."""
+        supported_languages = self.i18n_manager.get_supported_languages()
+        current_lang = self.i18n_manager.get_current_language()
+        
+        for lang_code, lang_info in supported_languages.items():
+            display_name = f"{lang_info['native']}"
+            self.language_combo.addItem(display_name, lang_code)
+            
+            # Set current language as selected
+            if lang_code == current_lang:
+                self.language_combo.setCurrentText(display_name)
+    
+    def on_language_changed(self, display_name: str):
+        """Handle language change from combo box."""
+        # Find language code from display name
+        for i in range(self.language_combo.count()):
+            if self.language_combo.itemText(i) == display_name:
+                lang_code = self.language_combo.itemData(i)
+                if lang_code and lang_code != self.i18n_manager.get_current_language():
+                    success = self.i18n_manager.set_language(lang_code)
+                    if success:
+                        QMessageBox.information(
+                            self,
+                            "Language Changed",
+                            f"Language changed to {display_name}.\n\n"
+                            "Please restart the application for all changes to take effect."
+                        )
+                        # Update window title immediately
+                        self.setWindowTitle(tr("app_title"))
+                break
+    
     def test_whatsapp_connection(self):
         """Test WhatsApp Business API connection."""
         if not self.whatsapp_service.is_configured():
@@ -920,7 +962,7 @@ CSC-Reach streamlines business communication processes with professional email t
     def preview_message(self):
         """Preview message for selected channel(s)."""
         if not self.customers:
-            QMessageBox.warning(self, "No Recipients", "Please import a CSV file first.")
+            QMessageBox.warning(self, tr("no_recipients"), tr("please_import_csv"))
             return
         
         # Use first customer for preview
@@ -936,30 +978,34 @@ CSC-Reach streamlines business communication processes with professional email t
         preview_text = ""
         
         # Email preview
-        if channel in ["Email Only", "Email + WhatsApp Business", "Email + WhatsApp Web"]:
+        if channel in [tr("email_only"), tr("email_whatsapp_business"), tr("email_whatsapp_web")]:
             preview_text += "📧 EMAIL PREVIEW:\n"
             preview_text += f"To: {customer.email}\n"
             preview_text += f"Subject: {rendered.get('subject', '')}\n\n"
             preview_text += rendered.get('content', '')
-            preview_text += "\n" + "="*50 + "\n\n"
+            preview_text += "\n" + "="*60 + "\n\n"
         
         # WhatsApp preview
-        if channel in ["WhatsApp Business API", "WhatsApp Web", "Email + WhatsApp Business", "Email + WhatsApp Web"]:
+        if channel in [tr("whatsapp_business_api"), tr("whatsapp_web"), tr("email_whatsapp_business"), tr("email_whatsapp_web")]:
             service_type = "Business API" if "Business" in channel else "Web Automation"
             preview_text += f"📱 WHATSAPP PREVIEW ({service_type}):\n"
             preview_text += f"To: {customer.phone}\n\n"
             whatsapp_content = rendered.get('whatsapp_content', rendered.get('content', ''))
             preview_text += whatsapp_content
             
-            if "Web" in channel:
-                preview_text += "\n\n⚠️ NOTE: WhatsApp Web will open in browser - you must manually send each message"
+            if tr("whatsapp_web") in channel:
+                preview_text += "\n\n⚠️ NOTE: WhatsApp Web will open in browser"
+                if hasattr(self.whatsapp_web_service, 'auto_send') and self.whatsapp_web_service.auto_send:
+                    preview_text += " - messages will be sent automatically"
+                else:
+                    preview_text += " - you must manually send each message"
         
-        # Show preview dialog
-        dialog = QMessageBox(self)
-        dialog.setWindowTitle("Message Preview")
-        dialog.setText(f"Preview for: {customer.name} ({customer.company})")
-        dialog.setDetailedText(preview_text)
-        dialog.setStandardButtons(QMessageBox.Ok)
+        # Show preview dialog with proper sizing
+        customer_display = f"{customer.name}"
+        if customer.company:
+            customer_display += f" ({customer.company})"
+        
+        dialog = PreviewDialog(customer_display, preview_text, self)
         dialog.exec()
     
     def update_current_template(self):
