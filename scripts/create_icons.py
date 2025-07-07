@@ -91,8 +91,8 @@ def main():
     # Get project root
     project_root = Path(__file__).parent.parent
     
-    # Source PNG file
-    png_path = project_root / "assets" / "icons" / "messager.png"
+    # Source PNG file - updated to use csc-reach.png
+    png_path = project_root / "assets" / "icons" / "csc-reach.png"
     
     if not png_path.exists():
         print(f"❌ Source PNG not found: {png_path}")
@@ -100,9 +100,9 @@ def main():
     
     print(f"📁 Source PNG: {png_path}")
     
-    # Create output paths
-    ico_path = project_root / "assets" / "icons" / "messager.ico"
-    icns_path = project_root / "assets" / "icons" / "messager.icns"
+    # Create output paths with csc-reach naming
+    ico_path = project_root / "assets" / "icons" / "csc-reach.ico"
+    icns_path = project_root / "assets" / "icons" / "csc-reach.icns"
     
     success = True
     

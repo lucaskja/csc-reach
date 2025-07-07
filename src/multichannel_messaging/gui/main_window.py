@@ -309,12 +309,12 @@ class MainWindow(QMainWindow):
             # Try to find the icon file
             icon_paths = [
                 # When running from source
-                Path(__file__).parent.parent.parent.parent / "assets" / "icons" / "messager.png",
+                Path(__file__).parent.parent.parent.parent / "assets" / "icons" / "csc-reach.png",
                 # When running from built app
-                Path(sys.executable).parent / "assets" / "icons" / "messager.png",
+                Path(sys.executable).parent / "assets" / "icons" / "csc-reach.png",
                 # Alternative paths
-                Path("assets/icons/messager.png"),
-                Path("../assets/icons/messager.png"),
+                Path("assets/icons/csc-reach.png"),
+                Path("../assets/icons/csc-reach.png"),
             ]
             
             for icon_path in icon_paths:

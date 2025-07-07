@@ -30,7 +30,7 @@ This document describes the build and packaging process for creating distributab
 The application uses a custom icon that needs to be converted to platform-specific formats:
 
 ### Source Icon
-- **Location**: `assets/icons/messager.png`
+- **Location**: `assets/icons/csc-reach.png`
 - **Format**: PNG with transparency
 - **Recommended Size**: 1024x1024 pixels minimum
 
@@ -45,8 +45,8 @@ python scripts/create_icons.py
 ```
 
 This creates:
-- `assets/icons/messager.icns` - macOS icon bundle
-- `assets/icons/messager.ico` - Windows icon file
+- `assets/icons/csc-reach.icns` - macOS icon bundle
+- `assets/icons/csc-reach.ico` - Windows icon file
 
 The build scripts automatically run this step, so manual icon creation is usually not necessary.
 
