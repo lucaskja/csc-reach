@@ -42,6 +42,17 @@ class ConfigManager:
                 "signature_include": True,
                 "batch_size": 50
             },
+            "whatsapp": {
+                "enabled": False,
+                "use_aws_secrets": True,
+                "secret_name": "csc-reach/whatsapp-credentials",
+                "aws_region": "us-east-1",
+                "rate_limit_per_minute": 20,
+                "daily_message_limit": 1000,
+                "api_version": "v18.0",
+                "timeout_seconds": 30,
+                "delay_between_messages": 3.0
+            },
             "quotas": {
                 "daily_limit": 100,
                 "reset_time": "00:00",
