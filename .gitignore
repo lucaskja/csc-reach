@@ -148,3 +148,9 @@ logs/
 temp/
 *.dmg
 *.exe
+# Project-specific organized structure
+build/dist/
+build/temp/
+build/logs/
+tests/fixtures/*.csv.bak
+docs/temp/

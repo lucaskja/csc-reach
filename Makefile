@@ -1,4 +1,4 @@
-# Makefile for Multi-Channel Bulk Messaging System
+# Makefile for CSC-Reach Multi-Channel Messaging System
 
 .PHONY: help install install-dev test test-unit test-integration lint format clean build run
 
@@ -14,7 +14,10 @@ help:
 	@echo "  format       - Format code with black"
 	@echo "  type-check   - Run type checking with mypy"
 	@echo "  clean        - Clean build artifacts"
-	@echo "  build        - Build application"
+	@echo "  build        - Build application for current platform"
+	@echo "  build-macos  - Build macOS application"
+	@echo "  build-windows - Build Windows application"
+	@echo "  dmg          - Create macOS DMG installer"
 	@echo "  run          - Run the application"
 
 # Installation targets
@@ -51,7 +54,6 @@ type-check:
 # Build targets
 clean:
 	rm -rf build/
-	rm -rf dist/
 	rm -rf *.egg-info/
 	find . -type d -name __pycache__ -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
@@ -59,17 +61,33 @@ clean:
 build:
 	python -m build
 
+# Platform-specific builds
+build-macos:
+	python scripts/build/build_macos.py
+
+build-windows:
+	python scripts/build/build_windows.py
+
+dmg:
+	python scripts/build/create_dmg.py
+
 # Run targets
 run:
 	python src/multichannel_messaging/main.py
 
 # Development setup
 setup-dev: install-dev
-	pre-commit install
+	python scripts/dev/setup_dev.py
 
-# Package building
-build-windows:
-	pyinstaller scripts/build_windows.spec
+# Documentation
+docs:
+	@echo "📚 Documentation structure:"
+	@echo "  docs/user/     - User guides and manuals"
+	@echo "  docs/dev/      - Developer documentation"
+	@echo "  docs/api/      - API documentation"
+	@echo "  docs/summaries/ - Implementation summaries"
 
-build-macos:
-	pyinstaller scripts/build_macos.spec
+# Project structure
+structure:
+	@echo "📁 Project structure:"
+	@tree -I 'venv|__pycache__|*.egg-info|build' -L 3
