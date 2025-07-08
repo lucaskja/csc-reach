@@ -4,23 +4,41 @@
 
 # Default target
 help:
-	@echo "Available targets:"
-	@echo "  install      - Install production dependencies"
-	@echo "  install-dev  - Install development dependencies"
-	@echo "  test         - Run all tests"
-	@echo "  test-unit    - Run unit tests only"
+	@echo "CSC-Reach Build System"
+	@echo "======================"
+	@echo ""
+	@echo "🏗️  Build Commands:"
+	@echo "  build            - Build for all platforms (enhanced)"
+	@echo "  build-quick      - Quick build with simple interface"
+	@echo "  build-macos      - Build macOS application only"
+	@echo "  build-windows    - Build Windows application only"
+	@echo "  build-clean      - Clean build and rebuild all"
+	@echo "  dmg              - Create macOS DMG installer"
+	@echo "  zip-windows      - Create Windows ZIP distribution"
+	@echo ""
+	@echo "📦 Quick Build Commands:"
+	@echo "  make quick               # Build everything (simple)"
+	@echo "  make quick-macos         # Build only macOS (simple)"
+	@echo "  make quick-windows       # Build only Windows (simple)"
+	@echo "  make quick-clean         # Clean and rebuild all (simple)"
+	@echo ""
+	@echo "🔧 Development Commands:"
+	@echo "  install          - Install production dependencies"
+	@echo "  install-dev      - Install development dependencies"
+	@echo "  test             - Run all tests"
+	@echo "  test-unit        - Run unit tests only"
 	@echo "  test-integration - Run integration tests only"
-	@echo "  lint         - Run linting checks"
-	@echo "  format       - Format code with black"
-	@echo "  type-check   - Run type checking with mypy"
-	@echo "  clean        - Clean build artifacts"
-	@echo "  build        - Build application for current platform"
-	@echo "  build-all    - Build for all platforms (macOS + Windows)"
-	@echo "  build-macos  - Build macOS application"
-	@echo "  build-windows - Build Windows application"
-	@echo "  dmg          - Create macOS DMG installer"
-	@echo "  zip-windows  - Create Windows ZIP distribution"
-	@echo "  run          - Run the application"
+	@echo "  lint             - Run linting checks"
+	@echo "  format           - Format code with black"
+	@echo "  type-check       - Run type checking with mypy"
+	@echo "  clean            - Clean build artifacts"
+	@echo "  run              - Run the application"
+	@echo ""
+	@echo "📊 Utility Commands:"
+	@echo "  docs             - Show documentation structure"
+	@echo "  structure        - Show project structure"
+	@echo "  dist-summary     - Show distribution summary"
+	@echo "  build-status     - Show build status and logs"
 
 # Installation targets
 install:
@@ -53,31 +71,58 @@ format:
 type-check:
 	mypy src/
 
-# Build targets
+# Enhanced build targets
+build:
+	@echo "🏗️  Starting Enhanced Unified Build..."
+	python scripts/build/build_unified.py
+
+build-quick:
+	@echo "🚀 Starting Quick Build..."
+	python build.py
+
+build-macos:
+	@echo "🍎 Building for macOS..."
+	python scripts/build/build_unified.py --platform macos
+
+build-windows:
+	@echo "🪟 Building for Windows..."
+	python scripts/build/build_unified.py --platform windows
+
+build-clean:
+	@echo "🧹 Clean build for all platforms..."
+	python scripts/build/build_unified.py --clean
+
+# Quick build targets (simple interface)
+quick:
+	python build.py
+
+quick-macos:
+	python build.py macos
+
+quick-windows:
+	python build.py windows
+
+quick-clean:
+	python build.py clean
+
+# Legacy build targets (for compatibility)
+dmg:
+	python scripts/build/create_dmg.py
+
+zip-windows:
+	python scripts/build/create_windows_zip.py
+
+# Clean targets
 clean:
 	rm -rf build/
 	rm -rf *.egg-info/
 	find . -type d -name __pycache__ -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
 
-build:
-	python -m build
-
-# Platform-specific builds
-build-all:
-	python scripts/build/build_all.py
-
-build-macos:
-	python scripts/build/build_macos.py
-
-build-windows:
-	python scripts/build/build_windows.py
-
-dmg:
-	python scripts/build/create_dmg.py
-
-zip-windows:
-	python scripts/build/create_windows_zip.py
+clean-all: clean
+	rm -rf venv/
+	rm -rf .pytest_cache/
+	rm -rf htmlcov/
 
 # Run targets
 run:
@@ -98,7 +143,7 @@ docs:
 # Project structure
 structure:
 	@echo "📁 Project structure:"
-	@tree -I 'venv|__pycache__|*.egg-info|build' -L 3
+	@tree -I 'venv|__pycache__|*.egg-info|build' -L 3 || echo "Install 'tree' command for better output"
 
 # Distribution summary
 dist-summary:
@@ -107,7 +152,69 @@ dist-summary:
 	@if [ -d "build/dist" ]; then \
 		echo "📁 Location: build/dist/"; \
 		echo "📊 Files:"; \
-		ls -lah build/dist/ | grep -E '\.(dmg|zip|exe|app)$$' || echo "   No distribution files found"; \
+		find build/dist -name "*.dmg" -o -name "*.zip" -o -name "*.app" -o -name "*.exe" | while read file; do \
+			size=$$(du -h "$$file" | cut -f1); \
+			echo "   📁 $$(basename "$$file") ($$size)"; \
+		done; \
+		echo ""; \
+		echo "📈 Total size:"; \
+		du -sh build/dist/ | cut -f1 | xargs echo "   📊 Total:"; \
 	else \
-		echo "❌ No build directory found. Run 'make build-all' first."; \
+		echo "❌ No build directory found. Run 'make build' first."; \
 	fi
+
+# Build status and logs
+build-status:
+	@echo "🔍 Build Status:"
+	@echo "==============="
+	@if [ -d "build" ]; then \
+		echo "📁 Build directory: build/"; \
+		if [ -d "build/dist" ]; then \
+			echo "✅ Distribution directory exists"; \
+			find build/dist -name "*.dmg" -o -name "*.zip" -o -name "*.app" | wc -l | xargs echo "📦 Distribution files:"; \
+		else \
+			echo "❌ No distribution directory"; \
+		fi; \
+		if [ -d "build/logs" ]; then \
+			echo "📄 Recent build logs:"; \
+			ls -lt build/logs/*.log 2>/dev/null | head -5 | while read line; do \
+				echo "   $$line"; \
+			done; \
+		else \
+			echo "❌ No build logs found"; \
+		fi; \
+	else \
+		echo "❌ No build directory found"; \
+	fi
+
+# Advanced build options
+build-verbose:
+	python scripts/build/build_unified.py --verbose
+
+build-no-prereq:
+	python scripts/build/build_unified.py --no-prereq-check
+
+build-macos-app-only:
+	python scripts/build/build_unified.py --platform macos --macos-only app
+
+build-windows-exe-only:
+	python scripts/build/build_unified.py --platform windows --windows-only exe
+
+# Help for build system
+build-help:
+	@echo "🏗️  CSC-Reach Enhanced Build System"
+	@echo "=================================="
+	@echo ""
+	@echo "The build system has been enhanced with:"
+	@echo "• 🎯 Intelligent prerequisite checking"
+	@echo "• 📊 Comprehensive build reporting"
+	@echo "• 🔍 Detailed logging and error tracking"
+	@echo "• ⚡ Parallel build support (future)"
+	@echo "• 🧹 Smart cleaning with log preservation"
+	@echo "• 📦 Automatic output verification"
+	@echo ""
+	@echo "For detailed options:"
+	@echo "  python scripts/build/build_unified.py --help"
+	@echo ""
+	@echo "For quick building:"
+	@echo "  python build.py --help"
