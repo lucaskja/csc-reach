@@ -1,0 +1,143 @@
+{
+  "templates": [
+    {
+      "id": "welcome_email",
+      "name": "Welcome Email Template",
+      "channels": ["email"],
+      "subject": "Welcome to CSC-Reach, {name}!",
+      "content": "Dear {name},\n\nWelcome to CSC-Reach! We're excited to have {company} as part of our community.\n\nOur platform will help you streamline your communication processes and reach your customers more effectively.\n\nIf you have any questions, please don't hesitate to contact our support team.\n\nBest regards,\nThe CSC-Reach Team",
+      "whatsapp_content": "",
+      "language": "en",
+      "variables": ["name", "company"],
+      "created_at": "2024-01-01T12:00:00",
+      "updated_at": "2024-01-01T12:00:00"
+    },
+    {
+      "id": "follow_up_email",
+      "name": "Follow-up Email Template",
+      "channels": ["email"],
+      "subject": "Following up with {name} from {company}",
+      "content": "Hi {name},\n\nI wanted to follow up on our previous conversation about CSC-Reach.\n\nHave you had a chance to review the information I sent? I'd be happy to answer any questions you might have about how our platform can benefit {company}.\n\nWould you be available for a brief call this week to discuss your communication needs?\n\nLooking forward to hearing from you.\n\nBest regards,\nCSC-Reach Team",
+      "whatsapp_content": "",
+      "language": "en",
+      "variables": ["name", "company"],
+      "created_at": "2024-01-01T12:00:00",
+      "updated_at": "2024-01-01T12:00:00"
+    },
+    {
+      "id": "promotional_whatsapp",
+      "name": "Promotional WhatsApp Template",
+      "channels": ["whatsapp"],
+      "subject": "",
+      "content": "",
+      "whatsapp_content": "🎉 Special offer for {company}!\n\nHi {name}! We have an exclusive promotion just for you.\n\n✅ 30% off your first month\n✅ Free setup and training\n✅ Dedicated support\n\nThis offer expires soon! Reply 'YES' to claim your discount.\n\nCSC-Reach Team 🚀",
+      "language": "en",
+      "variables": ["name", "company"],
+      "created_at": "2024-01-01T12:00:00",
+      "updated_at": "2024-01-01T12:00:00"
+    },
+    {
+      "id": "multi_channel_template",
+      "name": "Multi-Channel Welcome Template",
+      "channels": ["email", "whatsapp"],
+      "subject": "Welcome to CSC-Reach, {name}!",
+      "content": "Dear {name},\n\nThank you for choosing CSC-Reach for {company}'s communication needs.\n\nWe're committed to helping you:\n• Streamline your outreach processes\n• Improve customer engagement\n• Save time with automated workflows\n\nOur team is here to support you every step of the way.\n\nBest regards,\nCSC-Reach Team",
+      "whatsapp_content": "Hi {name}! 👋\n\nWelcome to CSC-Reach! We're excited to help {company} improve customer communication.\n\n🚀 Ready to get started?\n📞 Need help? Just reply to this message!\n\nCSC-Reach Team",
+      "language": "en",
+      "variables": ["name", "company"],
+      "created_at": "2024-01-01T12:00:00",
+      "updated_at": "2024-01-01T12:00:00"
+    },
+    {
+      "id": "support_template",
+      "name": "Customer Support Template",
+      "channels": ["email"],
+      "subject": "We're here to help, {name}",
+      "content": "Hello {name},\n\nThank you for contacting CSC-Reach support.\n\nWe've received your inquiry regarding {company}'s account and our team is working on it.\n\nYou can expect a response within 24 hours. In the meantime, you might find our FAQ section helpful: [FAQ Link]\n\nIf you have any urgent concerns, please don't hesitate to call our support line.\n\nBest regards,\nCSC-Reach Support Team",
+      "whatsapp_content": "",
+      "language": "en",
+      "variables": ["name", "company"],
+      "created_at": "2024-01-01T12:00:00",
+      "updated_at": "2024-01-01T12:00:00"
+    }
+  ],
+  "categories": [
+    {
+      "id": "welcome",
+      "name": "Welcome Messages",
+      "description": "Templates for welcoming new customers and users",
+      "color": "#4CAF50",
+      "created_at": "2024-01-01T12:00:00"
+    },
+    {
+      "id": "follow_up",
+      "name": "Follow-up",
+      "description": "Templates for following up with prospects and customers",
+      "color": "#FF9800",
+      "created_at": "2024-01-01T12:00:00"
+    },
+    {
+      "id": "promotional",
+      "name": "Promotional",
+      "description": "Marketing and promotional message templates",
+      "color": "#E91E63",
+      "created_at": "2024-01-01T12:00:00"
+    },
+    {
+      "id": "support",
+      "name": "Support",
+      "description": "Customer support and service templates",
+      "color": "#2196F3",
+      "created_at": "2024-01-01T12:00:00"
+    },
+    {
+      "id": "general",
+      "name": "General",
+      "description": "General purpose templates",
+      "color": "#607D8B",
+      "created_at": "2024-01-01T12:00:00"
+    }
+  ],
+  "metadata": {
+    "welcome_email": {
+      "category_id": "welcome",
+      "description": "Standard welcome email for new customers",
+      "tags": ["welcome", "onboarding", "email"],
+      "usage_count": 15,
+      "created_at": "2024-01-01T12:00:00",
+      "updated_at": "2024-01-01T12:00:00"
+    },
+    "follow_up_email": {
+      "category_id": "follow_up",
+      "description": "Follow-up email for prospects",
+      "tags": ["follow-up", "sales", "email"],
+      "usage_count": 8,
+      "created_at": "2024-01-01T12:00:00",
+      "updated_at": "2024-01-01T12:00:00"
+    },
+    "promotional_whatsapp": {
+      "category_id": "promotional",
+      "description": "Promotional WhatsApp message with special offer",
+      "tags": ["promotion", "discount", "whatsapp"],
+      "usage_count": 23,
+      "created_at": "2024-01-01T12:00:00",
+      "updated_at": "2024-01-01T12:00:00"
+    },
+    "multi_channel_template": {
+      "category_id": "welcome",
+      "description": "Welcome template for both email and WhatsApp",
+      "tags": ["welcome", "multi-channel", "onboarding"],
+      "usage_count": 12,
+      "created_at": "2024-01-01T12:00:00",
+      "updated_at": "2024-01-01T12:00:00"
+    },
+    "support_template": {
+      "category_id": "support",
+      "description": "Customer support response template",
+      "tags": ["support", "customer-service", "email"],
+      "usage_count": 5,
+      "created_at": "2024-01-01T12:00:00",
+      "updated_at": "2024-01-01T12:00:00"
+    }
+  }
+}

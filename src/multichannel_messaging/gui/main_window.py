@@ -20,9 +20,11 @@ from PySide6.QtGui import QAction, QFont, QIcon
 from ..core.config_manager import ConfigManager
 from ..core.csv_processor import CSVProcessor
 from ..core.models import Customer, MessageTemplate, MessageChannel
+from ..core.template_manager import TemplateManager
 from ..services.email_service import EmailService
 from ..services.whatsapp_local_service import LocalWhatsAppBusinessService
 from ..services.whatsapp_web_service import WhatsAppWebService
+from .template_library_dialog import TemplateLibraryDialog
 from ..gui.whatsapp_settings_dialog import WhatsAppSettingsDialog
 from ..gui.whatsapp_web_settings_dialog import WhatsAppWebSettingsDialog
 from ..gui.language_settings_dialog import LanguageSettingsDialog
@@ -99,6 +101,7 @@ class MainWindow(QMainWindow):
         self.email_service = None
         self.whatsapp_service = LocalWhatsAppBusinessService()  # WhatsApp Business API service
         self.whatsapp_web_service = WhatsAppWebService()  # WhatsApp Web service (no dependencies)
+        self.template_manager = TemplateManager(self.config_manager)  # Template management system
         self.customers: List[Customer] = []
         self.current_template: Optional[MessageTemplate] = None
         self.sending_thread: Optional[EmailSendingThread] = None
@@ -159,6 +162,36 @@ class MainWindow(QMainWindow):
         exit_action.setShortcut("Ctrl+Q")
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
+        
+        # Templates menu
+        templates_menu = menubar.addMenu(self.i18n_manager.tr("menu_templates"))
+        
+        template_library_action = QAction(self.i18n_manager.tr("template_library_menu"), self)
+        template_library_action.setShortcut("Ctrl+T")
+        template_library_action.triggered.connect(self.open_template_library)
+        templates_menu.addAction(template_library_action)
+        
+        templates_menu.addSeparator()
+        
+        new_template_action = QAction(self.i18n_manager.tr("new_template_menu"), self)
+        new_template_action.setShortcut("Ctrl+N")
+        new_template_action.triggered.connect(self.create_new_template)
+        templates_menu.addAction(new_template_action)
+        
+        save_template_action = QAction(self.i18n_manager.tr("save_current_template"), self)
+        save_template_action.setShortcut("Ctrl+S")
+        save_template_action.triggered.connect(self.save_current_template)
+        templates_menu.addAction(save_template_action)
+        
+        templates_menu.addSeparator()
+        
+        import_template_action = QAction(self.i18n_manager.tr("import_template_menu"), self)
+        import_template_action.triggered.connect(self.import_template_file)
+        templates_menu.addAction(import_template_action)
+        
+        export_templates_action = QAction(self.i18n_manager.tr("export_all_templates_menu"), self)
+        export_templates_action.triggered.connect(self.export_all_templates)
+        templates_menu.addAction(export_templates_action)
         
         # Tools menu
         tools_menu = menubar.addMenu("Tools")
@@ -306,15 +339,26 @@ class MainWindow(QMainWindow):
         template_group = QGroupBox("Message Template")
         template_layout = QVBoxLayout(template_group)
         
-        # Template selector (placeholder for now)
+        # Template selector with management
         template_selector_layout = QHBoxLayout()
-        template_selector_layout.addWidget(QLabel("Template:"))
+        template_selector_layout.addWidget(QLabel(self.i18n_manager.tr("message_template") + ":"))
         self.template_combo = QComboBox()
-        self.template_combo.addItem("Default Welcome Message")
+        self.template_combo.currentTextChanged.connect(self.on_template_changed)
         template_selector_layout.addWidget(self.template_combo)
         
+        # Template management buttons
+        self.template_library_btn = QPushButton(self.i18n_manager.tr("library"))
+        self.template_library_btn.setToolTip(self.i18n_manager.tr("template_library"))
+        self.template_library_btn.clicked.connect(self.open_template_library)
+        template_selector_layout.addWidget(self.template_library_btn)
+        
+        self.save_template_btn = QPushButton(self.i18n_manager.tr("save"))
+        self.save_template_btn.setToolTip(self.i18n_manager.tr("save_current_template"))
+        self.save_template_btn.clicked.connect(self.save_current_template)
+        template_selector_layout.addWidget(self.save_template_btn)
+        
         # Add preview button
-        self.preview_btn = QPushButton("Preview Message")
+        self.preview_btn = QPushButton(self.i18n_manager.tr("preview_message"))
         self.preview_btn.clicked.connect(self.preview_message)
         template_selector_layout.addWidget(self.preview_btn)
         
@@ -439,35 +483,227 @@ class MainWindow(QMainWindow):
         self.update_status_display()
     
     def load_default_template(self):
-        """Load default multi-channel template."""
-        self.current_template = MessageTemplate(
-            id="default_welcome",
-            name="Default Welcome Message",
-            channels=["email", "whatsapp"],
-            subject="Welcome to our service, {name}!",
-            content="""Dear {name},
+        """Load default template and populate template combo."""
+        # Load available templates into combo
+        self.refresh_template_combo()
+        
+        # Try to load existing default template
+        existing_templates = self.template_manager.get_templates()
+        default_template = None
+        
+        for template in existing_templates:
+            if template.id == "default_welcome":
+                default_template = template
+                break
+        
+        # Create default template if it doesn't exist
+        if not default_template:
+            default_template = MessageTemplate(
+                id="default_welcome",
+                name="Default Welcome Message",
+                channels=["email", "whatsapp"],
+                subject="Welcome to CSC-Reach - Let's Connect!",
+                content="""Dear {name},
 
-Thank you for your interest in our services. We're excited to have {company} as part of our community.
+I hope this message finds you well. I'm reaching out from CSC-Reach to introduce our comprehensive communication platform designed to streamline your business outreach.
 
-If you have any questions, please don't hesitate to contact us.
+At {company}, we understand the importance of effective communication in today's fast-paced business environment. Our platform offers:
+
+• Seamless email integration with Microsoft Outlook
+• Multi-channel messaging capabilities
+• Professional template management
+• Real-time progress tracking
+• Cross-platform compatibility
+
+I'd love to schedule a brief call to discuss how CSC-Reach can benefit your organization and help you achieve your communication goals more efficiently.
+
+Please let me know a convenient time for you, and I'll be happy to arrange a demonstration.
 
 Best regards,
-The Team""",
-            whatsapp_content="""Hello {name}! 👋
+CSC-Reach Team
 
-Thank you for your interest in our services. We're excited to have {company} join our community!
+P.S. Feel free to reply to this email or call us directly. We're here to help!""",
+                whatsapp_content="""Hi {name}! 👋
 
-Feel free to reach out if you have any questions.
+Hope you're doing well! I'm reaching out from CSC-Reach about our communication platform that could really help {company}.
+
+We specialize in:
+✅ Email automation with Outlook
+✅ Multi-channel messaging
+✅ Professional templates
+✅ Real-time tracking
+
+Would love to show you how it works! When's a good time for a quick call?
 
 Best regards,
-The Team""",
-            variables=["name", "company"]
+CSC-Reach Team""",
+                variables=["name", "company"]
+            )
+            
+            # Save the default template
+            self.template_manager.save_template(
+                default_template, 
+                category_id="welcome",
+                description="Default welcome message template for new contacts"
+            )
+        
+        # Set as current template
+        self.current_template = default_template
+        self.load_template_into_ui(default_template)
+        
+        # Select in combo
+        for i in range(self.template_combo.count()):
+            if self.template_combo.itemData(i) == default_template.id:
+                self.template_combo.setCurrentIndex(i)
+                break
+    
+    def refresh_template_combo(self):
+        """Refresh the template combo box with available templates."""
+        self.template_combo.clear()
+        
+        templates = self.template_manager.get_templates()
+        if not templates:
+            self.template_combo.addItem(self.i18n_manager.tr("no_templates_available"), None)
+            return
+        
+        # Group templates by category
+        categories = {}
+        for template in templates:
+            metadata = self.template_manager.get_template_metadata(template.id)
+            category_id = metadata.get("category_id", "general")
+            category = self.template_manager.get_category(category_id)
+            
+            # Translate category name
+            if category_id == "welcome":
+                category_name = self.i18n_manager.tr("category_welcome")
+            elif category_id == "follow_up":
+                category_name = self.i18n_manager.tr("category_follow_up")
+            elif category_id == "promotional":
+                category_name = self.i18n_manager.tr("category_promotional")
+            elif category_id == "support":
+                category_name = self.i18n_manager.tr("category_support")
+            elif category_id == "general":
+                category_name = self.i18n_manager.tr("category_general")
+            else:
+                category_name = category.name if category else self.i18n_manager.tr("category_general")
+            
+            if category_name not in categories:
+                categories[category_name] = []
+            categories[category_name].append(template)
+        
+        # Add templates to combo, grouped by category
+        for category_name in sorted(categories.keys()):
+            if len(categories) > 1:  # Only add separator if multiple categories
+                self.template_combo.addItem(f"── {category_name} ──", None)
+            
+            for template in sorted(categories[category_name], key=lambda t: t.name):
+                channels_text = "/".join(template.channels).upper()
+                display_name = f"{template.name} ({channels_text})"
+                self.template_combo.addItem(display_name, template.id)
+    
+    def load_template_into_ui(self, template: MessageTemplate):
+        """Load template data into UI fields."""
+        if not template:
+            return
+        
+        self.subject_edit.setPlainText(template.subject)
+        self.content_edit.setPlainText(template.content)
+        self.whatsapp_content_edit.setPlainText(template.whatsapp_content)
+        self.update_whatsapp_char_count()
+    
+    def on_template_changed(self):
+        """Handle template selection change."""
+        template_id = self.template_combo.currentData()
+        if not template_id:
+            return
+        
+        template = self.template_manager.get_template(template_id)
+        if template:
+            self.current_template = template
+            self.load_template_into_ui(template)
+    
+    def open_template_library(self):
+        """Open the template library dialog."""
+        dialog = TemplateLibraryDialog(self.template_manager, self)
+        dialog.template_selected.connect(self.on_template_selected_from_library)
+        dialog.exec()
+        
+        # Refresh combo in case templates were modified
+        self.refresh_template_combo()
+    
+    def on_template_selected_from_library(self, template: MessageTemplate):
+        """Handle template selection from library."""
+        self.current_template = template
+        self.load_template_into_ui(template)
+        
+        # Update combo selection
+        for i in range(self.template_combo.count()):
+            if self.template_combo.itemData(i) == template.id:
+                self.template_combo.setCurrentIndex(i)
+                break
+    
+    def save_current_template(self):
+        """Save the current template with modifications."""
+        if not self.current_template:
+            QMessageBox.information(self, self.i18n_manager.tr("no_template_loaded"), 
+                                  self.i18n_manager.tr("no_template_loaded"))
+            return
+        
+        # Update template with current UI content
+        self.update_current_template()
+        
+        # Save template
+        metadata = self.template_manager.get_template_metadata(self.current_template.id)
+        if self.template_manager.save_template(
+            self.current_template,
+            category_id=metadata.get("category_id", "general"),
+            description=metadata.get("description", ""),
+            tags=metadata.get("tags", [])
+        ):
+            QMessageBox.information(self, self.i18n_manager.tr("template_saved_success").split("'")[0], 
+                                  self.i18n_manager.tr("template_saved_success", name=self.current_template.name))
+        else:
+            QMessageBox.critical(self, self.i18n_manager.tr("template_save_failed"), 
+                               self.i18n_manager.tr("template_save_failed"))
+    
+    def create_new_template(self):
+        """Create a new template."""
+        from .template_library_dialog import TemplateEditDialog
+        dialog = TemplateEditDialog(self.template_manager, parent=self)
+        if dialog.exec() == QDialog.Accepted:
+            self.refresh_template_combo()
+    
+    def import_template_file(self):
+        """Import a template from file."""
+        filename, _ = QFileDialog.getOpenFileName(
+            self, "Import Template",
+            "", "JSON Files (*.json)"
         )
         
-        self.subject_edit.setPlainText(self.current_template.subject)
-        self.content_edit.setPlainText(self.current_template.content)
-        self.whatsapp_content_edit.setPlainText(self.current_template.whatsapp_content)
-        self.update_whatsapp_char_count()
+        if filename:
+            template = self.template_manager.import_template(Path(filename))
+            if template:
+                QMessageBox.information(self, "Success", f"Template '{template.name}' imported successfully.")
+                self.refresh_template_combo()
+            else:
+                QMessageBox.critical(self, "Error", "Failed to import template.")
+    
+    def export_all_templates(self):
+        """Export all templates to file."""
+        from datetime import datetime
+        filename, _ = QFileDialog.getSaveFileName(
+            self, "Export All Templates",
+            f"all_templates_{datetime.now().strftime('%Y%m%d')}.json",
+            "JSON Files (*.json)"
+        )
+        
+        if filename:
+            from pathlib import Path
+            export_path = self.template_manager.export_all_templates(Path(filename))
+            if export_path:
+                QMessageBox.information(self, "Success", f"All templates exported to {filename}")
+            else:
+                QMessageBox.critical(self, "Error", "Failed to export templates.")
     
     def import_csv(self):
         """Import CSV file with customer data."""

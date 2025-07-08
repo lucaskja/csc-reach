@@ -30,14 +30,24 @@ CSC-Reach is fully functional and ready for production use on both platforms:
 - **CSV file processing** (customer name, company name, telephone number, email)
 - **Email composition and sending** via Outlook integration
 - **Cross-platform Outlook integration** (macOS AppleScript + Windows COM)
-- **Default and customizable message templates** for email
-- **Multi-language support** (Portuguese, Spanish, English) - *Framework ready*
+- **Professional Template Management System** with library, categories, and import/export
+- **Multi-language support** (Portuguese, Spanish, English) with complete internationalization
 - **Cross-platform compatibility** (Windows and macOS)
 - **Daily messaging quota management** (100 per day per user) - *Framework ready*
 - **User-friendly interface** for CSV file input and template customization
 - **Real-time progress tracking** and comprehensive logging
 - **Email preview functionality** before sending
 - **Draft email creation** for testing and review
+
+### Template Management Features
+- **Template Library**: Organize templates by categories (Welcome, Follow-up, Promotional, Support, General)
+- **Multi-Channel Templates**: Create templates for email, WhatsApp, or both channels
+- **Import/Export**: Share templates between installations or create backups
+- **Real-time Preview**: See how templates will look with actual customer data
+- **Search & Filter**: Quickly find templates by name, content, or category
+- **Usage Analytics**: Track template popularity and usage statistics
+- **Automatic Backups**: Templates are automatically backed up before modifications
+- **Variable Substitution**: Use {name}, {company}, etc. for personalized messages
 
 ## Technologies Used
 
@@ -161,19 +171,52 @@ Ensure Outlook is installed and configured with your email account before using 
 ## Development
 
 ### Project Structure
+
 ```
-sbai-dg-wpp/
-├── src/multichannel_messaging/          # Main application package
-│   ├── gui/                            # User interface components
-│   ├── core/                           # Business logic and models
-│   ├── services/                       # External service integrations
-│   ├── utils/                          # Utility functions
-│   └── localization/                   # Multi-language support
-├── tests/                              # Test suite
-├── config/                             # Configuration files
-├── assets/                             # Static resources
-├── scripts/                            # Build and utility scripts
-└── docs/                               # Documentation
+sbai-dg-wpp/                           # Clean root with only essentials
+├── README.md                          # Main project documentation
+├── LICENSE                            # License file
+├── pyproject.toml                     # Modern Python packaging
+├── .gitignore                         # Git ignore rules
+├── Makefile                           # Build automation
+├── 
+├── src/                               # Source code
+│   └── multichannel_messaging/        # Main package
+│       ├── __init__.py
+│       ├── main.py
+│       ├── core/                      # Business logic
+│       ├── gui/                       # User interface
+│       ├── services/                  # External integrations
+│       ├── utils/                     # Utilities
+│       └── localization/              # Translations
+│
+├── tests/                             # All tests
+│   ├── unit/                          # Unit tests
+│   ├── integration/                   # Integration tests
+│   └── fixtures/                      # Test data
+│
+├── docs/                              # All documentation
+│   ├── user/                          # User guides
+│   ├── dev/                           # Developer docs
+│   ├── api/                           # API documentation
+│   └── summaries/                     # Implementation summaries
+│
+├── scripts/                           # Build and utility scripts
+│   ├── build/                         # Build scripts
+│   ├── dev/                           # Development utilities
+│   └── deploy/                        # Deployment scripts
+│
+├── assets/                            # Static resources
+│   ├── icons/
+│   └── templates/
+│
+├── config/                            # Configuration files
+│   └── default_config.yaml
+│
+└── build/                             # Build outputs (gitignored)
+    ├── dist/                          # Distribution files
+    ├── temp/                          # Temporary build files
+    └── logs/                          # Build logs
 ```
 
 ### Development Setup
@@ -191,7 +234,12 @@ pip install -e ".[dev]"
 python src/multichannel_messaging/main.py
 
 # Run tests
-pytest
+pytest tests/
+
+# Run specific test categories
+pytest tests/unit/                    # Unit tests only
+pytest tests/integration/             # Integration tests only
+pytest tests/unit/test_template_*     # Template management tests
 
 # Format code
 black src/ tests/
@@ -200,6 +248,51 @@ black src/ tests/
 python scripts/build_macos.py    # macOS
 python scripts/build_windows.py  # Windows
 ```
+
+### Testing
+
+The project includes comprehensive test coverage with proper organization:
+
+#### Test Structure
+```
+tests/
+├── unit/                           # Fast, isolated unit tests
+│   ├── test_template_management.py # Template manager core functionality
+│   ├── test_template_i18n.py      # Internationalization tests
+│   └── test_*.py                   # Other unit tests
+├── integration/                    # End-to-end integration tests
+│   ├── test_template_workflow.py  # Complete template workflows
+│   └── test_*.py                   # Other integration tests
+└── fixtures/                       # Test data and fixtures
+    ├── sample_templates.json       # Sample template data
+    ├── test_customers.csv          # Test customer data
+    └── *.json                      # Other test fixtures
+```
+
+#### Running Tests
+```bash
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=src/multichannel_messaging
+
+# Run specific test files
+pytest tests/unit/test_template_management.py
+pytest tests/integration/test_template_workflow.py
+
+# Run tests with verbose output
+pytest -v
+
+# Run tests matching a pattern
+pytest -k "template"
+```
+
+#### Test Categories
+- **Unit Tests**: Fast, isolated tests for individual components
+- **Integration Tests**: End-to-end workflow testing
+- **Internationalization Tests**: Multi-language support validation
+- **Template Management Tests**: Comprehensive template system testing
 
 ## Future Enhancements
 
