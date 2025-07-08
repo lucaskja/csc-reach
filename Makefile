@@ -15,9 +15,11 @@ help:
 	@echo "  type-check   - Run type checking with mypy"
 	@echo "  clean        - Clean build artifacts"
 	@echo "  build        - Build application for current platform"
+	@echo "  build-all    - Build for all platforms (macOS + Windows)"
 	@echo "  build-macos  - Build macOS application"
 	@echo "  build-windows - Build Windows application"
 	@echo "  dmg          - Create macOS DMG installer"
+	@echo "  zip-windows  - Create Windows ZIP distribution"
 	@echo "  run          - Run the application"
 
 # Installation targets
@@ -62,6 +64,9 @@ build:
 	python -m build
 
 # Platform-specific builds
+build-all:
+	python scripts/build/build_all.py
+
 build-macos:
 	python scripts/build/build_macos.py
 
@@ -70,6 +75,9 @@ build-windows:
 
 dmg:
 	python scripts/build/create_dmg.py
+
+zip-windows:
+	python scripts/build/create_windows_zip.py
 
 # Run targets
 run:
@@ -91,3 +99,15 @@ docs:
 structure:
 	@echo "📁 Project structure:"
 	@tree -I 'venv|__pycache__|*.egg-info|build' -L 3
+
+# Distribution summary
+dist-summary:
+	@echo "📦 Distribution Summary:"
+	@echo "======================="
+	@if [ -d "build/dist" ]; then \
+		echo "📁 Location: build/dist/"; \
+		echo "📊 Files:"; \
+		ls -lah build/dist/ | grep -E '\.(dmg|zip|exe|app)$$' || echo "   No distribution files found"; \
+	else \
+		echo "❌ No build directory found. Run 'make build-all' first."; \
+	fi
