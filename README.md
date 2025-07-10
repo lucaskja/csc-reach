@@ -80,7 +80,24 @@ CSC-Reach is fully functional and ready for production use on both platforms:
 
 ## Installation
 
-### macOS
+### For End Users (Non-Technical)
+
+**📖 Complete Installation Guides for Everyone:**
+
+#### Windows Users (Most Common)
+- **[Windows Installation Guide](docs/user/windows_installation_guide.md)** - Step-by-step installation for Windows 10/11
+- **[Quick Start Guide](docs/user/quick_start_guide.md)** - Get started in 5 minutes
+- **[User Manual](docs/user/user_manual.md)** - Complete guide to using CSC-Reach
+- **[Troubleshooting Guide](docs/user/troubleshooting_guide.md)** - Fix common problems
+
+#### Mac Users
+- **[macOS Installation Guide](docs/user/macos_installation_guide.md)** - Step-by-step installation for macOS
+
+> **💡 These guides are written for non-technical users** with simple language, screenshots descriptions, and step-by-step instructions.
+
+### For Developers
+
+#### macOS
 
 #### Option 1: Download Pre-built App (Recommended)
 1. Download `CSC-Reach-macOS.dmg` from the releases page
