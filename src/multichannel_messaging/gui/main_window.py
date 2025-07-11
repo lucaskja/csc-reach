@@ -238,14 +238,20 @@ class MainWindow(QMainWindow):
         # Channel selection
         toolbar_layout.addWidget(QLabel(tr("send_via")))
         self.channel_combo = QComboBox()
-        self.channel_combo.addItems([
-            tr("email_only"), 
-            tr("whatsapp_business_api"), 
-            tr("whatsapp_web"), 
-            tr("email_whatsapp_business"), 
-            tr("email_whatsapp_web")
-        ])
-        self.channel_combo.setCurrentText(tr("email_only"))  # Default to email for backward compatibility
+        
+        # Store channel data as (display_text, channel_id) pairs
+        channel_options = [
+            (tr("email_only"), "email_only"),
+            (tr("whatsapp_business_api"), "whatsapp_business"),
+            (tr("whatsapp_web"), "whatsapp_web"),
+            (tr("email_whatsapp_business"), "email_whatsapp_business"),
+            (tr("email_whatsapp_web"), "email_whatsapp_web")
+        ]
+        
+        for display_text, channel_id in channel_options:
+            self.channel_combo.addItem(display_text, channel_id)
+        
+        self.channel_combo.setCurrentIndex(0)  # Default to email only
         self.channel_combo.currentTextChanged.connect(self.on_channel_changed)
         toolbar_layout.addWidget(self.channel_combo)
         
@@ -860,7 +866,7 @@ CSC-Reach Team""",
     def send_emails(self):
         """Start sending emails - backward compatibility method."""
         # Set channel to email only and call new method
-        self.channel_combo.setCurrentText("Email Only")
+        self.channel_combo.setCurrentIndex(0)  # First item is email_only
         self.send_messages()
         self.stop_btn.setEnabled(True)
         self.progress_bar.setMaximum(len(selected_customers))
@@ -904,10 +910,10 @@ CSC-Reach Team""",
     def preview_email(self):
         """Preview email - backward compatibility method."""
         # Set channel to email and call new preview method
-        original_channel = self.channel_combo.currentText()
-        self.channel_combo.setCurrentText("Email Only")
+        original_index = self.channel_combo.currentIndex()
+        self.channel_combo.setCurrentIndex(0)  # Set to email_only
         self.preview_message()
-        self.channel_combo.setCurrentText(original_channel)
+        self.channel_combo.setCurrentIndex(original_index)  # Restore original
         subject_label = QLabel("Subject:")
         subject_label.setStyleSheet("font-weight: bold; margin-top: 10px;")
         layout.addWidget(subject_label)
@@ -1030,13 +1036,13 @@ CSC-Reach streamlines business communication processes with professional email t
     
     def update_send_button_text(self):
         """Update send button text based on selected channel."""
-        channel = self.channel_combo.currentText()
-        if channel == "Email Only":
-            self.send_btn.setText("Send Emails")
-        elif channel in ["WhatsApp Business API", "WhatsApp Web"]:
-            self.send_btn.setText("Send WhatsApp")
+        channel_id = self.get_current_channel_id()
+        if channel_id == "email_only":
+            self.send_btn.setText(self.i18n_manager.tr("send_emails"))
+        elif channel_id in ["whatsapp_business", "whatsapp_web"]:
+            self.send_btn.setText(self.i18n_manager.tr("send_whatsapp"))
         else:
-            self.send_btn.setText("Send Messages")
+            self.send_btn.setText(self.i18n_manager.tr("send_messages"))
     
     def update_status_display(self):
         """Update status bar based on service availability."""
@@ -1210,11 +1216,11 @@ CSC-Reach streamlines business communication processes with professional email t
         # Generate preview content
         rendered = self.current_template.render(customer)
         
-        channel = self.channel_combo.currentText()
+        channel_id = self.get_current_channel_id()
         preview_text = ""
         
         # Email preview
-        if channel in [tr("email_only"), tr("email_whatsapp_business"), tr("email_whatsapp_web")]:
+        if channel_id in ["email_only", "email_whatsapp_business", "email_whatsapp_web"]:
             preview_text += "📧 EMAIL PREVIEW:\n"
             preview_text += f"To: {customer.email}\n"
             preview_text += f"Subject: {rendered.get('subject', '')}\n\n"
@@ -1222,14 +1228,14 @@ CSC-Reach streamlines business communication processes with professional email t
             preview_text += "\n" + "="*60 + "\n\n"
         
         # WhatsApp preview
-        if channel in [tr("whatsapp_business_api"), tr("whatsapp_web"), tr("email_whatsapp_business"), tr("email_whatsapp_web")]:
-            service_type = "Business API" if "Business" in channel else "Web Automation"
+        if channel_id in ["whatsapp_business", "whatsapp_web", "email_whatsapp_business", "email_whatsapp_web"]:
+            service_type = "Business API" if "business" in channel_id else "Web Automation"
             preview_text += f"📱 WHATSAPP PREVIEW ({service_type}):\n"
             preview_text += f"To: {customer.phone}\n\n"
             whatsapp_content = rendered.get('whatsapp_content', rendered.get('content', ''))
             preview_text += whatsapp_content
             
-            if tr("whatsapp_web") in channel:
+            if "whatsapp_web" in channel_id:
                 preview_text += "\n\n⚠️ NOTE: WhatsApp Web will open in browser"
                 if hasattr(self.whatsapp_web_service, 'auto_send') and self.whatsapp_web_service.auto_send:
                     preview_text += " - messages will be sent automatically"
@@ -1251,21 +1257,30 @@ CSC-Reach streamlines business communication processes with professional email t
             self.current_template.content = self.content_edit.toPlainText()
             self.current_template.whatsapp_content = self.whatsapp_content_edit.toPlainText()
     
+    def get_current_channel_id(self) -> str:
+        """Get the current channel ID from the combo box."""
+        current_index = self.channel_combo.currentIndex()
+        if current_index >= 0:
+            return self.channel_combo.itemData(current_index)
+        return "email_only"  # Default fallback
+    
     def send_messages(self):
         """Send messages via selected channel(s) - replaces send_emails."""
         selected_customers = self.get_selected_customers()
         if not selected_customers:
-            QMessageBox.warning(self, "No Recipients", "Please select at least one recipient.")
+            QMessageBox.warning(self, self.i18n_manager.tr("no_recipients"), 
+                              self.i18n_manager.tr("please_select_recipients"))
             return
         
-        channel = self.channel_combo.currentText()
+        channel_id = self.get_current_channel_id()
+        channel_display = self.channel_combo.currentText()
         
         # Validate channel availability
-        if channel in ["Email Only", "Email + WhatsApp Business", "Email + WhatsApp Web"] and not self.email_service:
+        if channel_id in ["email_only", "email_whatsapp_business", "email_whatsapp_web"] and not self.email_service:
             QMessageBox.warning(self, "Email Service Error", "Email service is not available.")
             return
         
-        if channel in ["WhatsApp Business API", "Email + WhatsApp Business"] and not self.whatsapp_service.is_configured():
+        if channel_id in ["whatsapp_business", "email_whatsapp_business"] and not self.whatsapp_service.is_configured():
             QMessageBox.warning(
                 self, 
                 "WhatsApp Business API Not Configured", 
@@ -1273,7 +1288,7 @@ CSC-Reach streamlines business communication processes with professional email t
             )
             return
         
-        if channel in ["WhatsApp Web", "Email + WhatsApp Web"]:
+        if channel_id in ["whatsapp_web", "email_whatsapp_web"]:
             if not self.whatsapp_web_service.is_configured():
                 QMessageBox.warning(
                     self, 
@@ -1305,11 +1320,11 @@ CSC-Reach streamlines business communication processes with professional email t
         self.update_current_template()
         
         # Confirm sending
-        service_info = self._get_channel_description(channel)
+        service_info = self._get_channel_description(channel_id)
         reply = QMessageBox.question(
             self,
-            "Confirm Sending",
-            f"Send messages to {len(selected_customers)} recipients via {service_info}?",
+            self.i18n_manager.tr("confirm_sending"),
+            self.i18n_manager.tr("send_messages_to", count=len(selected_customers), channel=service_info),
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No
         )
@@ -1318,33 +1333,33 @@ CSC-Reach streamlines business communication processes with professional email t
             return
         
         # Start sending
-        self.start_multi_channel_sending(selected_customers, channel)
+        self.start_multi_channel_sending(selected_customers, channel_id)
     
-    def _get_channel_description(self, channel: str) -> str:
+    def _get_channel_description(self, channel_id: str) -> str:
         """Get user-friendly description of the selected channel."""
         descriptions = {
-            "Email Only": "email",
-            "WhatsApp Business API": "WhatsApp Business API",
-            "WhatsApp Web": "WhatsApp Web (manual sending required)",
-            "Email + WhatsApp Business": "email and WhatsApp Business API",
-            "Email + WhatsApp Web": "email and WhatsApp Web"
+            "email_only": "email",
+            "whatsapp_business": "WhatsApp Business API",
+            "whatsapp_web": "WhatsApp Web (manual sending required)",
+            "email_whatsapp_business": "email and WhatsApp Business API",
+            "email_whatsapp_web": "email and WhatsApp Web"
         }
-        return descriptions.get(channel, channel.lower())
+        return descriptions.get(channel_id, channel_id.lower())
     
-    def start_multi_channel_sending(self, customers: List[Customer], channel: str):
+    def start_multi_channel_sending(self, customers: List[Customer], channel_id: str):
         """Start multi-channel message sending."""
-        if channel == "Email Only":
+        if channel_id == "email_only":
             self.start_email_sending(customers)
-        elif channel == "WhatsApp Business API":
+        elif channel_id == "whatsapp_business":
             self.start_whatsapp_business_sending(customers)
-        elif channel == "WhatsApp Web":
+        elif channel_id == "whatsapp_web":
             self.start_whatsapp_web_sending(customers)
-        elif channel == "Email + WhatsApp Business":
+        elif channel_id == "email_whatsapp_business":
             self.start_email_and_whatsapp_business_sending(customers)
-        elif channel == "Email + WhatsApp Web":
+        elif channel_id == "email_whatsapp_web":
             self.start_email_and_whatsapp_web_sending(customers)
         else:
-            QMessageBox.warning(self, "Unknown Channel", f"Unknown channel: {channel}")
+            QMessageBox.warning(self, "Unknown Channel", f"Unknown channel: {channel_id}")
     
     def start_email_sending(self, customers: List[Customer]):
         """Start email-only sending (existing functionality)."""

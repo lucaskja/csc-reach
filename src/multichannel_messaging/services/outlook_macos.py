@@ -150,27 +150,18 @@ class OutlookMacOSService:
         subject_escaped = self._escape_for_applescript(subject)
         email_escaped = self._escape_for_applescript(email)
         
-        # For content, we'll use a different approach - build it line by line in AppleScript
-        lines = content.split('\n')
+        # For content, we need to properly handle line breaks
+        # Replace \n with AppleScript's return character
+        content_escaped = self._escape_for_applescript(content)
         
-        # Create AppleScript that builds the content with proper returns
-        content_lines = []
-        for line in lines:
-            escaped_line = self._escape_for_applescript(line)
-            content_lines.append(f'"{escaped_line}"')
-        
-        # Join lines with AppleScript's return character
-        content_script = ' & return & '.join(content_lines)
-        
-        # Build the complete AppleScript
+        # Build the complete AppleScript with proper line break handling
         action = "send newMessage" if send else "open newMessage"
         
         script = f'''
         tell application "Microsoft Outlook"
-            set emailContent to {content_script}
             set newMessage to make new outgoing message
             set subject of newMessage to "{subject_escaped}"
-            set content of newMessage to emailContent
+            set content of newMessage to "{content_escaped}"
             make new recipient at newMessage with properties {{email address:{{address:"{email_escaped}"}}}}
             {action}
         end tell
@@ -180,24 +171,31 @@ class OutlookMacOSService:
     
     def _escape_for_applescript(self, text: str) -> str:
         """
-        Properly escape text for AppleScript.
+        Properly escape text for AppleScript, preserving line breaks.
         
         Args:
             text: Text to escape
             
         Returns:
-            Escaped text safe for AppleScript
+            Escaped text safe for AppleScript with proper line breaks
         """
         if not text:
             return ""
         
-        # Escape backslashes first
-        escaped = text.replace('\\', '\\\\')
+        # First, normalize line endings to \n
+        normalized = text.replace('\r\n', '\n').replace('\r', '\n')
+        
+        # Escape backslashes first (but not the ones we'll add for \r)
+        escaped = normalized.replace('\\', '\\\\')
         
         # Escape quotes
         escaped = escaped.replace('"', '\\"')
         
-        # Don't escape \r since we want those for line breaks in AppleScript
+        # Convert \n to \r for AppleScript (carriage return)
+        # This is the key fix - AppleScript uses \r for line breaks
+        escaped = escaped.replace('\n', '\\r')
+        
+        return escaped
         # Escape tabs
         escaped = escaped.replace('\t', '\\t')
         
