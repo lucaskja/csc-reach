@@ -195,6 +195,8 @@ class OutlookMacOSService:
         # This is the key fix - AppleScript uses \r for line breaks
         escaped = escaped.replace('\n', '\\r')
         
+        logger.debug(f"AppleScript escaping: {len(text)} chars -> {len(escaped)} chars, line breaks: {text.count(chr(10))} -> {escaped.count('\\\\r')}")
+        
         return escaped
         # Escape tabs
         escaped = escaped.replace('\t', '\\t')

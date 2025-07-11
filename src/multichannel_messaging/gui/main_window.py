@@ -1258,10 +1258,19 @@ CSC-Reach streamlines business communication processes with professional email t
             self.current_template.whatsapp_content = self.whatsapp_content_edit.toPlainText()
     
     def get_current_channel_id(self) -> str:
-        """Get the current channel ID from the combo box."""
+        """
+        Get the current channel ID from the combo box.
+        
+        Returns:
+            str: Channel ID (e.g., 'email_only', 'whatsapp_business')
+        """
         current_index = self.channel_combo.currentIndex()
         if current_index >= 0:
-            return self.channel_combo.itemData(current_index)
+            channel_id = self.channel_combo.itemData(current_index)
+            logger.debug(f"Current channel ID: {channel_id}")
+            return channel_id
+        
+        logger.warning("No channel selected, defaulting to email_only")
         return "email_only"  # Default fallback
     
     def send_messages(self):
