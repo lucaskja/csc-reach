@@ -28,9 +28,14 @@ class OutlookMacOSService:
         """Initialize macOS Outlook service."""
         self.outlook_app = None
         
-        # Email formatting preferences
-        self.use_html_format = True  # Use HTML by default for better formatting
-        self.fallback_to_plain_text = True  # Fallback to plain text if HTML fails
+        # Email formatting preferences - multiple approaches with fallbacks
+        self.use_rtf_format = True  # Use RTF for better formatting preservation
+        self.use_file_based_content = True  # Use file-based content transfer
+        self.fallback_to_simple_text = True  # Fallback to simple text if RTF fails
+        
+        # Import logger following development guide
+        from ..utils.logger import get_logger
+        self.logger = get_logger(__name__)
         
         self._check_outlook_availability()
     
@@ -143,7 +148,7 @@ class OutlookMacOSService:
         """
         Build AppleScript for creating/sending email with proper line break handling.
         
-        Uses a safer plain text approach with proper line break handling.
+        Uses multiple approaches with fallbacks following development guide principles.
         
         Args:
             subject: Email subject
@@ -153,10 +158,26 @@ class OutlookMacOSService:
             
         Returns:
             AppleScript code
+            
+        Raises:
+            OutlookIntegrationError: If all approaches fail
         """
-        # For now, let's use the plain text approach which is more reliable
-        # HTML approach was causing AppleScript syntax errors
-        return self._build_plain_text_email_script(subject, content, email, send)
+        self.logger.info(f"Building email script for {email}, content length: {len(content)}")
+        
+        # Try file-based approach first (most reliable)
+        try:
+            self.logger.debug("Attempting file-based content approach")
+            return self._build_file_based_email_script(subject, content, email, send)
+        except Exception as e:
+            self.logger.warning(f"File-based approach failed: {e}")
+            
+        # Try simple text approach as fallback
+        try:
+            self.logger.debug("Falling back to simple text approach")
+            return self._build_simple_text_email_script(subject, content, email, send)
+        except Exception as e:
+            self.logger.error(f"Simple text approach failed: {e}")
+            raise OutlookIntegrationError("All email formatting approaches failed")
     
     def _build_plain_text_email_script(self, subject: str, content: str, email: str, send: bool = True) -> str:
         """
@@ -273,7 +294,160 @@ end tell'''
         logger.debug(f"Generated HTML email AppleScript")
         return script
     
-    def _convert_text_to_html(self, text: str) -> str:
+    def _build_file_based_email_script(self, subject: str, content: str, email: str, send: bool = True) -> str:
+        """
+        Build AppleScript using temporary file for content transfer.
+        
+        This approach writes content to a temporary file and uses AppleScript
+        to read it, avoiding string escaping issues entirely.
+        
+        Args:
+            subject: Email subject
+            content: Email content with line breaks
+            email: Recipient email address
+            send: Whether to send the email or just create draft
+            
+        Returns:
+            AppleScript code using file-based content
+        """
+        import tempfile
+        
+        # Create temporary file with content
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
+            f.write(content)
+            temp_file_path = f.name
+        
+        # Escape for AppleScript
+        subject_escaped = self._escape_for_applescript_ultra_safe(subject)
+        email_escaped = self._escape_for_applescript_ultra_safe(email)
+        file_path_escaped = temp_file_path.replace('\\', '\\\\').replace('"', '\\"')
+        
+        action = "send newMessage" if send else "open newMessage"
+        
+        script = f'''tell application "Microsoft Outlook"
+    set contentFile to POSIX file "{file_path_escaped}"
+    set fileContent to read contentFile as «class utf8»
+    set newMessage to make new outgoing message
+    set subject of newMessage to "{subject_escaped}"
+    set content of newMessage to fileContent
+    make new recipient at newMessage with properties {{email address:{{address:"{email_escaped}"}}}}
+    {action}
+end tell
+
+-- Clean up temporary file
+do shell script "rm '{file_path_escaped}'"'''
+        
+        self.logger.debug(f"Generated file-based email AppleScript using temp file: {temp_file_path}")
+        return script
+    
+    def _build_simple_text_email_script(self, subject: str, content: str, email: str, send: bool = True) -> str:
+        """
+        Build AppleScript using the simplest possible approach.
+        
+        This is the fallback method that uses minimal escaping and
+        relies on AppleScript's basic text handling.
+        
+        Args:
+            subject: Email subject
+            content: Email content with line breaks
+            email: Recipient email address
+            send: Whether to send the email or just create draft
+            
+        Returns:
+            AppleScript code for simple text email
+        """
+        # Ultra-minimal escaping - replace quotes with single quotes
+        subject_clean = subject.replace('"', "'").replace('\\', '')
+        email_clean = email.replace('"', "'").replace('\\', '')
+        content_clean = content.replace('"', "'").replace('\\', '')
+        
+        # Replace line breaks with AppleScript line break constant
+        content_clean = content_clean.replace('\n', '" & linefeed & "')
+        
+        action = "send newMessage" if send else "open newMessage"
+        
+        script = f'''tell application "Microsoft Outlook"
+    set newMessage to make new outgoing message
+    set subject of newMessage to "{subject_clean}"
+    set content of newMessage to "{content_clean}"
+    make new recipient at newMessage with properties {{email address:{{address:"{email_clean}"}}}}
+    {action}
+end tell'''
+        
+        self.logger.debug("Generated simple text email AppleScript")
+        return script
+    
+    def _escape_for_applescript_ultra_safe(self, text: str) -> str:
+        """
+        Ultra-safe AppleScript escaping following development guide error handling.
+        
+        Args:
+            text: Text to escape
+            
+        Returns:
+            Safely escaped text for AppleScript
+            
+        Raises:
+            ValueError: If text contains characters that cannot be safely escaped
+        """
+        if not text:
+            return ""
+        
+        try:
+            # Remove or replace problematic characters
+            safe_text = text
+            
+            # Replace quotes with single quotes to avoid escaping issues
+            safe_text = safe_text.replace('"', "'")
+            
+            # Remove backslashes entirely
+            safe_text = safe_text.replace('\\', '')
+            
+            # Remove control characters except line breaks
+            safe_text = ''.join(char for char in safe_text if ord(char) >= 32 or char in ['\n', '\r'])
+            
+            # Limit length to prevent AppleScript issues
+            if len(safe_text) > 10000:
+                safe_text = safe_text[:10000] + "..."
+                self.logger.warning("Text truncated to prevent AppleScript issues")
+            
+            self.logger.debug(f"Ultra-safe escaping: {len(text)} -> {len(safe_text)} chars")
+            return safe_text
+            
+        except Exception as e:
+            self.logger.error(f"Failed to escape text for AppleScript: {e}")
+            raise ValueError(f"Cannot safely escape text for AppleScript: {e}")
+    
+    # Update the main _build_email_script method to use new approaches
+    def _build_email_script_new(self, subject: str, content: str, email: str, send: bool = True) -> str:
+        """
+        Build AppleScript using new approaches with fallbacks.
+        
+        Args:
+            subject: Email subject
+            content: Email content with line breaks
+            email: Recipient email address
+            send: Whether to send the email or just create draft
+            
+        Returns:
+            AppleScript code
+        """
+        self.logger.info(f"Building email script for {email}, content length: {len(content)}")
+        
+        # Try file-based approach first (most reliable)
+        try:
+            self.logger.debug("Attempting file-based content approach")
+            return self._build_file_based_email_script(subject, content, email, send)
+        except Exception as e:
+            self.logger.warning(f"File-based approach failed: {e}")
+            
+        # Try simple text approach as fallback
+        try:
+            self.logger.debug("Falling back to simple text approach")
+            return self._build_simple_text_email_script(subject, content, email, send)
+        except Exception as e:
+            self.logger.error(f"Simple text approach failed: {e}")
+            raise OutlookIntegrationError("All email formatting approaches failed")
         """
         Convert plain text to HTML, preserving line breaks and formatting.
         
