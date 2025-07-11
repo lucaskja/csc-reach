@@ -27,6 +27,11 @@ class OutlookMacOSService:
     def __init__(self):
         """Initialize macOS Outlook service."""
         self.outlook_app = None
+        
+        # Email formatting preferences
+        self.use_html_format = True  # Use HTML by default for better formatting
+        self.fallback_to_plain_text = True  # Fallback to plain text if HTML fails
+        
         self._check_outlook_availability()
     
     def _check_outlook_availability(self) -> None:
@@ -115,27 +120,30 @@ class OutlookMacOSService:
     
     def _format_plain_text(self, text: str) -> str:
         """
-        Format plain text to ensure proper line breaks are preserved.
+        Format plain text - now just normalizes line endings without modification.
         
         Args:
             text: Plain text content
             
         Returns:
-            Formatted text with proper line breaks
+            Text with normalized line endings
         """
         if not text:
             return ""
         
-        # Normalize line endings to \n first
-        formatted = text.replace('\r\n', '\n').replace('\r', '\n')
+        # Just normalize line endings to \n - don't modify them
+        # The AppleScript builder will handle line breaks properly
+        normalized = text.replace('\r\n', '\n').replace('\r', '\n')
         
-        # For AppleScript, we need to use the return character constant
-        # Instead of literal \r, we'll use AppleScript's return constant
-        return formatted
+        logger.debug(f"Formatted plain text: {len(text)} chars, {text.count(chr(10))} line breaks")
+        
+        return normalized
     
     def _build_email_script(self, subject: str, content: str, email: str, send: bool = True) -> str:
         """
         Build AppleScript for creating/sending email with proper line break handling.
+        
+        Tries HTML formatting first, falls back to plain text if needed.
         
         Args:
             subject: Email subject
@@ -146,58 +154,176 @@ class OutlookMacOSService:
         Returns:
             AppleScript code
         """
+        if self.use_html_format:
+            try:
+                return self._build_html_email_script(subject, content, email, send)
+            except Exception as e:
+                logger.warning(f"HTML email script failed, falling back to plain text: {e}")
+                if self.fallback_to_plain_text:
+                    return self._build_plain_text_email_script(subject, content, email, send)
+                else:
+                    raise
+        else:
+            return self._build_plain_text_email_script(subject, content, email, send)
+    
+    def _build_html_email_script(self, subject: str, content: str, email: str, send: bool = True) -> str:
+        """
+        Build AppleScript for HTML email with proper formatting.
+        
+        Args:
+            subject: Email subject
+            content: Email content with line breaks
+            email: Recipient email address
+            send: Whether to send the email or just create draft
+            
+        Returns:
+            AppleScript code for HTML email
+        """
         # Escape basic characters for AppleScript strings
-        subject_escaped = self._escape_for_applescript(subject)
-        email_escaped = self._escape_for_applescript(email)
+        subject_escaped = self._escape_for_applescript_simple(subject)
+        email_escaped = self._escape_for_applescript_simple(email)
         
-        # For content, we need to properly handle line breaks
-        # Replace \n with AppleScript's return character
-        content_escaped = self._escape_for_applescript(content)
+        # Convert plain text to HTML to preserve formatting
+        html_content = self._convert_text_to_html(content)
+        html_escaped = self._escape_for_applescript_simple(html_content)
         
-        # Build the complete AppleScript with proper line break handling
+        # Build the complete AppleScript using HTML content
         action = "send newMessage" if send else "open newMessage"
         
         script = f'''
         tell application "Microsoft Outlook"
             set newMessage to make new outgoing message
             set subject of newMessage to "{subject_escaped}"
-            set content of newMessage to "{content_escaped}"
+            set content of newMessage to "{html_escaped}"
+            set format of newMessage to HTML format
             make new recipient at newMessage with properties {{email address:{{address:"{email_escaped}"}}}}
             {action}
         end tell
         '''
         
+        logger.debug(f"Generated HTML email AppleScript")
         return script
     
-    def _escape_for_applescript(self, text: str) -> str:
+    def _build_plain_text_email_script(self, subject: str, content: str, email: str, send: bool = True) -> str:
         """
-        Properly escape text for AppleScript, preserving line breaks.
+        Build AppleScript for plain text email using return concatenation.
+        
+        Args:
+            subject: Email subject
+            content: Email content with line breaks
+            email: Recipient email address
+            send: Whether to send the email or just create draft
+            
+        Returns:
+            AppleScript code for plain text email
+        """
+        # Escape basic characters for AppleScript strings
+        subject_escaped = self._escape_for_applescript_simple(subject)
+        email_escaped = self._escape_for_applescript_simple(email)
+        
+        # Split content into lines and build AppleScript content construction
+        lines = content.split('\n')
+        
+        # Build AppleScript content using native return concatenation
+        if len(lines) == 1:
+            # Single line - simple case
+            content_script = f'"{self._escape_for_applescript_simple(lines[0])}"'
+        else:
+            # Multiple lines - use AppleScript return concatenation
+            escaped_lines = []
+            for line in lines:
+                escaped_line = self._escape_for_applescript_simple(line)
+                escaped_lines.append(f'"{escaped_line}"')
+            
+            # Join with AppleScript's return keyword
+            content_script = ' & return & '.join(escaped_lines)
+        
+        # Build the complete AppleScript
+        action = "send newMessage" if send else "open newMessage"
+        
+        script = f'''
+        tell application "Microsoft Outlook"
+            set emailContent to {content_script}
+            set newMessage to make new outgoing message
+            set subject of newMessage to "{subject_escaped}"
+            set content of newMessage to emailContent
+            make new recipient at newMessage with properties {{email address:{{address:"{email_escaped}"}}}}
+            {action}
+        end tell
+        '''
+        
+        logger.debug(f"Generated plain text email AppleScript with {len(lines)} content lines")
+        return script
+    
+    def _convert_text_to_html(self, text: str) -> str:
+        """
+        Convert plain text to HTML, preserving line breaks and formatting.
+        
+        Args:
+            text: Plain text content
+            
+        Returns:
+            HTML formatted content
+        """
+        if not text:
+            return ""
+        
+        # Escape HTML special characters
+        html = text.replace('&', '&amp;')
+        html = html.replace('<', '&lt;')
+        html = html.replace('>', '&gt;')
+        
+        # Convert line breaks to HTML
+        # Double line breaks become paragraph breaks
+        html = html.replace('\n\n', '</p><p>')
+        
+        # Single line breaks become <br> tags
+        html = html.replace('\n', '<br>')
+        
+        # Wrap in paragraph tags
+        html = f'<p>{html}</p>'
+        
+        # Clean up empty paragraphs
+        html = html.replace('<p></p>', '')
+        html = html.replace('<p><br></p>', '<p>&nbsp;</p>')
+        
+        logger.debug(f"Converted text to HTML: {len(text)} chars -> {len(html)} chars")
+        
+        return html
+    
+    def _escape_for_applescript_simple(self, text: str) -> str:
+        """
+        Simple AppleScript escaping without line break handling.
         
         Args:
             text: Text to escape
             
         Returns:
-            Escaped text safe for AppleScript with proper line breaks
+            Escaped text safe for AppleScript (no line break conversion)
         """
         if not text:
             return ""
         
-        # First, normalize line endings to \n
-        normalized = text.replace('\r\n', '\n').replace('\r', '\n')
-        
-        # Escape backslashes first (but not the ones we'll add for \r)
-        escaped = normalized.replace('\\', '\\\\')
+        # Escape backslashes first
+        escaped = text.replace('\\', '\\\\')
         
         # Escape quotes
         escaped = escaped.replace('"', '\\"')
         
-        # Convert \n to \r for AppleScript (carriage return)
-        # This is the key fix - AppleScript uses \r for line breaks
-        escaped = escaped.replace('\n', '\\r')
-        
-        logger.debug(f"AppleScript escaping: {len(text)} chars -> {len(escaped)} chars, line breaks: {text.count(chr(10))} -> {escaped.count('\\\\r')}")
-        
+        # Don't touch line breaks - they'll be handled by AppleScript return concatenation
         return escaped
+    
+    def _escape_for_applescript(self, text: str) -> str:
+        """
+        Legacy method - now uses simple escaping.
+        
+        Args:
+            text: Text to escape
+            
+        Returns:
+            Escaped text safe for AppleScript
+        """
+        return self._escape_for_applescript_simple(text)
         # Escape tabs
         escaped = escaped.replace('\t', '\\t')
         

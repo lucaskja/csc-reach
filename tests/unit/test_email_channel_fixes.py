@@ -109,20 +109,88 @@ The Team""",
         assert "Lucas Alves" in content, "Customer name should be substituted"
         assert "Example Corp" in content, "Company name should be substituted"
     
-    def test_applescript_escaping_converts_linebreaks(self):
-        """Test that AppleScript escaping properly converts line breaks."""
+    def test_html_email_conversion(self):
+        """Test HTML email conversion preserves formatting."""
         try:
             from multichannel_messaging.services.outlook_macos import OutlookMacOSService
             
             service = OutlookMacOSService()
             
-            test_text = "Line 1\nLine 2\n\nLine 4"
-            escaped = service._escape_for_applescript(test_text)
+            test_text = "Paragraph 1\n\nParagraph 2\nLine 2 of paragraph 2"
+            html = service._convert_text_to_html(test_text)
             
-            # Check that \n was converted to \r for AppleScript
-            assert '\\r' in escaped, "Should contain AppleScript line breaks (\\r)"
-            assert '\n' not in escaped, "Should not contain literal \\n characters"
-            assert escaped.count('\\r') == 3, "Should have correct number of line breaks"
+            # Check that paragraphs are created
+            assert '<p>' in html, "Should contain paragraph tags"
+            assert '</p>' in html, "Should contain closing paragraph tags"
+            
+            # Check that line breaks within paragraphs become <br>
+            assert '<br>' in html, "Should contain line break tags"
+            
+            # Check HTML escaping
+            test_html = "Text with <tags> & \"quotes\""
+            escaped_html = service._convert_text_to_html(test_html)
+            assert '&lt;' in escaped_html, "Should escape < characters"
+            assert '&amp;' in escaped_html, "Should escape & characters"
+            
+        except ImportError:
+            pytest.skip("macOS Outlook service not available")
+    
+    def test_html_email_script_generation(self):
+        """Test HTML email AppleScript generation."""
+        try:
+            from multichannel_messaging.services.outlook_macos import OutlookMacOSService
+            
+            service = OutlookMacOSService()
+            
+            test_content = "Line 1\n\nLine 3"
+            script = service._build_html_email_script(
+                "Test Subject", test_content, "test@example.com", False
+            )
+            
+            # Check that HTML format is set
+            assert "HTML format" in script, "Should set HTML format"
+            
+            # Check that HTML tags are present
+            assert "<p>" in script, "Should contain HTML paragraph tags"
+            
+        except ImportError:
+            pytest.skip("macOS Outlook service not available")
+    
+    def test_plain_text_email_script_generation(self):
+        """Test plain text email AppleScript generation with return concatenation."""
+        try:
+            from multichannel_messaging.services.outlook_macos import OutlookMacOSService
+            
+            service = OutlookMacOSService()
+            
+            test_content = "Line 1\nLine 2\nLine 3"
+            script = service._build_plain_text_email_script(
+                "Test Subject", test_content, "test@example.com", False
+            )
+            
+            # Check that return concatenation is used
+            assert "& return &" in script, "Should use return concatenation"
+            
+            # Check that HTML format is NOT set
+            assert "HTML format" not in script, "Should not set HTML format for plain text"
+            
+        except ImportError:
+            pytest.skip("macOS Outlook service not available")
+    
+    def test_email_formatting_fallback(self):
+        """Test that email formatting can fallback from HTML to plain text."""
+        try:
+            from multichannel_messaging.services.outlook_macos import OutlookMacOSService
+            
+            service = OutlookMacOSService()
+            
+            # Test that both HTML and plain text methods exist
+            assert hasattr(service, '_build_html_email_script'), "Should have HTML email method"
+            assert hasattr(service, '_build_plain_text_email_script'), "Should have plain text email method"
+            
+            # Test configuration options
+            assert hasattr(service, 'use_html_format'), "Should have HTML format option"
+            assert hasattr(service, 'fallback_to_plain_text'), "Should have fallback option"
             
         except ImportError:
             pytest.skip("macOS Outlook service not available")
