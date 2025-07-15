@@ -1,0 +1,201 @@
+# CSC-Reach Build Configuration
+# This file contains all build settings and can be customized as needed
+
+project:
+  name: "CSC-Reach"
+  version: "1.0.0"
+  description: "Multi-Channel Bulk Messaging System"
+  author: "CSC Development Team"
+
+# Build settings
+build:
+  # Timeout for individual build steps (seconds)
+  timeout: 1800  # 30 minutes
+  
+  # Whether to preserve logs when cleaning
+  preserve_logs: true
+  
+  # Whether to run prerequisite checks by default
+  check_prerequisites: true
+  
+  # Parallel building (future feature)
+  parallel: false
+
+# Platform-specific settings
+platforms:
+  macos:
+    enabled: true
+    app:
+      name: "CSC-Reach.app"
+      bundle_id: "com.csc-reach.app"
+      icon: "assets/icons/csc-reach.icns"
+      min_os_version: "10.14"
+    dmg:
+      name: "CSC-Reach-macOS.dmg"
+      volume_name: "CSC-Reach"
+      background_image: null  # Optional DMG background
+    
+  windows:
+    enabled: true
+    exe:
+      name: "CSC-Reach.exe"
+      icon: "assets/icons/csc-reach.ico"
+      console: false
+      min_os_version: "10.0"  # Windows 10
+    zip:
+      name: "CSC-Reach-Windows.zip"
+      include_installer_guide: true
+
+# Dependencies and requirements
+dependencies:
+  python:
+    min_version: "3.8"
+    max_version: "3.13"
+  
+  required_packages:
+    - "PySide6>=6.0.0"
+    - "pandas>=1.3.0"
+    - "PyInstaller>=5.0.0"
+    - "PyYAML>=5.4.0"
+    - "chardet>=4.0.0"
+    - "colorlog>=6.0.0"
+    - "cerberus>=1.3.0"
+    - "Babel>=2.9.0"
+  
+  platform_specific:
+    macos:
+      - "pyobjc-framework-ScriptingBridge"
+      - "pyobjc-framework-Cocoa"
+    windows:
+      - "pywin32>=227"
+      - "pythoncom"
+
+# PyInstaller settings
+pyinstaller:
+  # Common settings for all platforms
+  common:
+    clean: true
+    noconfirm: true
+    onedir: true  # Create one-directory bundle
+    windowed: true  # No console window
+    optimize: 2  # Python optimization level
+    
+    # Files to exclude
+    excludes:
+      - "tkinter"
+      - "matplotlib"
+      - "scipy"
+      - "numpy.distutils"
+      - "test"
+      - "unittest"
+      - "pydoc"
+      - "doctest"
+    
+    # Hidden imports (common to all platforms)
+    hidden_imports:
+      - "multichannel_messaging.gui.main_window"
+      - "multichannel_messaging.core.config_manager"
+      - "multichannel_messaging.core.csv_processor"
+      - "multichannel_messaging.core.models"
+      - "multichannel_messaging.core.i18n_manager"
+      - "multichannel_messaging.utils.logger"
+      - "multichannel_messaging.utils.exceptions"
+      - "multichannel_messaging.utils.platform_utils"
+      - "PySide6.QtCore"
+      - "PySide6.QtGui"
+      - "PySide6.QtWidgets"
+      - "pandas"
+      - "yaml"
+      - "chardet"
+      - "colorlog"
+      - "cerberus"
+      - "babel"
+  
+  # Platform-specific settings
+  macos:
+    hidden_imports:
+      - "multichannel_messaging.services.outlook_macos"
+      - "ScriptingBridge"
+      - "Foundation"
+      - "objc"
+    excludes:
+      - "win32com"
+      - "pythoncom"
+      - "pywintypes"
+  
+  windows:
+    hidden_imports:
+      - "multichannel_messaging.services.outlook_windows"
+      - "win32com.client"
+      - "pythoncom"
+      - "pywintypes"
+    excludes:
+      - "ScriptingBridge"
+      - "Foundation"
+      - "objc"
+
+# Data files to include
+data_files:
+  - source: "config/default_config.yaml"
+    destination: "config"
+  - source: "assets/templates/*.yaml"
+    destination: "assets/templates"
+  - source: "src/multichannel_messaging/localization/*.json"
+    destination: "multichannel_messaging/localization"
+  - source: "assets/icons/*"
+    destination: "assets/icons"
+
+# Build verification
+verification:
+  # Files that must exist after build
+  required_files:
+    macos:
+      - "CSC-Reach.app"
+      - "CSC-Reach-macOS.dmg"
+    windows:
+      - "CSC-Reach/CSC-Reach"  # Note: no .exe extension on macOS build
+      - "CSC-Reach-Windows.zip"
+  
+  # Minimum file sizes (MB)
+  min_sizes:
+    macos:
+      app: 150  # Minimum app size
+      dmg: 80   # Minimum DMG size
+    windows:
+      exe: 10   # Minimum executable size
+      zip: 100  # Minimum ZIP size
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(levelname)s - %(message)s"
+  
+  # Log file retention
+  max_log_files: 10
+  max_log_age_days: 30
+
+# Distribution settings
+distribution:
+  # Where to copy final distribution files
+  output_dir: "build/dist"
+  
+  # Whether to create checksums
+  create_checksums: true
+  
+  # Compression settings
+  compression:
+    dmg:
+      format: "UDZO"  # Compressed
+    zip:
+      compression_level: 6  # Balanced compression
+
+# Development settings
+development:
+  # Whether to include debug symbols
+  debug_symbols: false
+  
+  # Whether to strip binaries
+  strip_binaries: true
+  
+  # Whether to optimize for size
+  optimize_size: true
