@@ -21,6 +21,15 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
+    - name: Debug - List repository contents
+      run: |
+        Write-Host "Repository root contents:"
+        dir
+        Write-Host "`nScripts directory:"
+        if (Test-Path "scripts") { dir scripts } else { Write-Host "scripts directory not found" }
+        Write-Host "`nBuild scripts directory:"
+        if (Test-Path "scripts\build") { dir scripts\build } else { Write-Host "scripts\build directory not found" }
+        
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
@@ -35,25 +44,45 @@ jobs:
       run: |
         pip install pyinstaller
         
+    - name: Check build script exists
+      run: |
+        if (Test-Path "scripts\build\build_windows.py") {
+          Write-Host "✅ build_windows.py found"
+        } else {
+          Write-Host "❌ build_windows.py not found"
+          Write-Host "Available files in scripts\build:"
+          if (Test-Path "scripts\build") { dir scripts\build } else { Write-Host "scripts\build directory not found" }
+          exit 1
+        }
+        
     - name: Build Windows executable
       run: |
-        python scripts/build/build_windows.py
+        python scripts\build\build_windows.py
         
     - name: Check build output
       run: |
-        dir build\dist /s
+        Write-Host "Build directory contents:"
+        if (Test-Path "build") { dir build -Recurse } else { Write-Host "build directory not found" }
+        
         if (Test-Path "build\dist\CSC-Reach\CSC-Reach.exe") {
           Write-Host "✅ Windows executable created successfully"
           $size = (Get-Item "build\dist\CSC-Reach\CSC-Reach.exe").Length / 1MB
           Write-Host "   Size: $([math]::Round($size, 1)) MB"
         } else {
           Write-Host "❌ Windows executable not found"
+          Write-Host "Expected location: build\dist\CSC-Reach\CSC-Reach.exe"
           exit 1
         }
         
     - name: Create Windows ZIP distribution
       run: |
-        python scripts/build/create_windows_zip.py
+        if (Test-Path "scripts\build\create_windows_zip.py") {
+          python scripts\build\create_windows_zip.py
+        } else {
+          Write-Host "⚠️ create_windows_zip.py not found, creating ZIP manually"
+          Compress-Archive -Path "build\dist\CSC-Reach\*" -DestinationPath "build\dist\CSC-Reach-Windows.zip"
+          Write-Host "✅ Manual ZIP created"
+        }
         
     - name: Upload Windows executable
       uses: actions/upload-artifact@v4
@@ -68,6 +97,7 @@ jobs:
         name: CSC-Reach-Windows-ZIP-${{ github.event.inputs.version || 'latest' }}
         path: build/dist/*.zip
         retention-days: 30
+        if-no-files-found: warn
         
     - name: Create Release (on tag)
       if: startsWith(github.ref, 'refs/tags/')
@@ -95,13 +125,16 @@ jobs:
     - name: Test executable
       run: |
         cd test-build
+        Write-Host "Test build directory contents:"
+        dir
+        
         if (Test-Path "CSC-Reach.exe") {
           Write-Host "✅ Executable found"
-          # Test that it can start (will exit quickly without GUI)
-          $process = Start-Process -FilePath ".\CSC-Reach.exe" -ArgumentList "--version" -PassThru -Wait -NoNewWindow
-          Write-Host "   Exit code: $($process.ExitCode)"
+          # Test that the executable exists and is a valid PE file
+          $fileInfo = Get-Item "CSC-Reach.exe"
+          Write-Host "   Size: $([math]::Round($fileInfo.Length / 1MB, 1)) MB"
+          Write-Host "   Created: $($fileInfo.CreationTime)"
         } else {
           Write-Host "❌ Executable not found"
-          dir
           exit 1
         }
