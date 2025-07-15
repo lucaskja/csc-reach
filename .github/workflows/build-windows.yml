@@ -1,0 +1,107 @@
+name: Build Windows Executable
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v1.0.0)'
+        required: false
+        default: 'latest'
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+        
+    - name: Install PyInstaller
+      run: |
+        pip install pyinstaller
+        
+    - name: Build Windows executable
+      run: |
+        python scripts/build/build_windows.py
+        
+    - name: Check build output
+      run: |
+        dir build\dist /s
+        if (Test-Path "build\dist\CSC-Reach\CSC-Reach.exe") {
+          Write-Host "✅ Windows executable created successfully"
+          $size = (Get-Item "build\dist\CSC-Reach\CSC-Reach.exe").Length / 1MB
+          Write-Host "   Size: $([math]::Round($size, 1)) MB"
+        } else {
+          Write-Host "❌ Windows executable not found"
+          exit 1
+        }
+        
+    - name: Create Windows ZIP distribution
+      run: |
+        python scripts/build/create_windows_zip.py
+        
+    - name: Upload Windows executable
+      uses: actions/upload-artifact@v3
+      with:
+        name: CSC-Reach-Windows-${{ github.event.inputs.version || 'latest' }}
+        path: build/dist/CSC-Reach/
+        retention-days: 30
+        
+    - name: Upload Windows ZIP
+      uses: actions/upload-artifact@v3
+      with:
+        name: CSC-Reach-Windows-ZIP-${{ github.event.inputs.version || 'latest' }}
+        path: build/dist/*.zip
+        retention-days: 30
+        
+    - name: Create Release (on tag)
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          build/dist/*.zip
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  test-windows-build:
+    needs: build-windows
+    runs-on: windows-latest
+    
+    steps:
+    - name: Download Windows executable
+      uses: actions/download-artifact@v3
+      with:
+        name: CSC-Reach-Windows-${{ github.event.inputs.version || 'latest' }}
+        path: ./test-build/
+        
+    - name: Test executable
+      run: |
+        cd test-build
+        if (Test-Path "CSC-Reach.exe") {
+          Write-Host "✅ Executable found"
+          # Test that it can start (will exit quickly without GUI)
+          $process = Start-Process -FilePath ".\CSC-Reach.exe" -ArgumentList "--version" -PassThru -Wait -NoNewWindow
+          Write-Host "   Exit code: $($process.ExitCode)"
+        } else {
+          Write-Host "❌ Executable not found"
+          dir
+          exit 1
+        }

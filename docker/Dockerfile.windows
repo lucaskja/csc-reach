@@ -1,0 +1,47 @@
+# Dockerfile for building Windows executable
+# Uses Wine to run Windows Python on Linux
+
+FROM ubuntu:22.04
+
+# Install Wine and dependencies
+RUN apt-get update && apt-get install -y \
+    wget \
+    software-properties-common \
+    gnupg2 \
+    && wget -nc https://dl.winehq.org/wine-builds/winehq.key \
+    && apt-key add winehq.key \
+    && add-apt-repository 'deb https://dl.winehq.org/wine-builds/ubuntu/ jammy main' \
+    && apt-get update \
+    && apt-get install -y winehq-stable \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set up Wine environment
+ENV WINEPREFIX=/root/.wine
+ENV WINEARCH=win64
+RUN winecfg
+
+# Download and install Python for Windows
+RUN wget https://www.python.org/ftp/python/3.11.8/python-3.11.8-amd64.exe \
+    && wine python-3.11.8-amd64.exe /quiet InstallAllUsers=1 PrependPath=1 \
+    && rm python-3.11.8-amd64.exe
+
+# Set up Python environment
+ENV PYTHONPATH="/root/.wine/drive_c/Program Files/Python311"
+ENV PATH="$PATH:/root/.wine/drive_c/Program Files/Python311:/root/.wine/drive_c/Program Files/Python311/Scripts"
+
+# Install pip and dependencies
+RUN wine python -m pip install --upgrade pip
+RUN wine python -m pip install pyinstaller
+
+# Set working directory
+WORKDIR /app
+
+# Copy project files
+COPY . .
+
+# Install project dependencies
+RUN wine python -m pip install -e ".[dev]"
+
+# Build script
+CMD ["wine", "python", "scripts/build/build_windows.py"]
