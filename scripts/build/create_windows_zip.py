@@ -8,10 +8,33 @@ import shutil
 import zipfile
 from pathlib import Path
 
+# Import safe console utilities
+try:
+    from safe_console import safe_print, safe_format_size, safe_status
+except ImportError:
+    # Fallback if safe_console is not available
+    def safe_print(*args, **kwargs):
+        try:
+            print(*args, **kwargs)
+        except UnicodeEncodeError:
+            # Replace problematic characters and try again
+            safe_args = []
+            for arg in args:
+                text = str(arg).encode('ascii', 'replace').decode('ascii')
+                safe_args.append(text)
+            print(*safe_args, **kwargs)
+    
+    def safe_format_size(size_bytes):
+        return f"{size_bytes / (1024 * 1024):.1f} MB"
+    
+    def safe_status(success, message=""):
+        prefix = "[OK]" if success else "[ERROR]"
+        safe_print(f"{prefix} {message}")
+
 
 def main():
     """Create Windows ZIP distribution."""
-    print("📦 Creating Windows ZIP distribution for CSC-Reach...")
+    safe_print("Creating Windows ZIP distribution for CSC-Reach...")
     
     # Get project root (scripts/build -> scripts -> root)
     project_root = Path(__file__).parent.parent.parent
@@ -21,16 +44,16 @@ def main():
     zip_path = project_root / 'build' / 'dist' / 'CSC-Reach-Windows.zip'
     
     if not exe_folder.exists():
-        print("❌ Windows executable folder not found. Please build the Windows version first.")
+        safe_status(False, "Windows executable folder not found. Please build the Windows version first.")
         return False
     
     # Remove existing ZIP
     if zip_path.exists():
         zip_path.unlink()
-        print("🗑️  Removed existing ZIP")
+        safe_print("Removed existing ZIP")
     
     # Create ZIP
-    print("🔨 Creating ZIP distribution...")
+    safe_print("Creating ZIP distribution...")
     try:
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
             # Add all files from the CSC-Reach folder
@@ -40,13 +63,12 @@ def main():
                     arcname = file_path.relative_to(exe_folder.parent)
                     zipf.write(file_path, arcname)
         
-        print(f"✅ ZIP created successfully: {zip_path}")
+        safe_status(True, f"ZIP created successfully: {zip_path}")
         
         # Get ZIP size
         try:
             size_bytes = zip_path.stat().st_size
-            size_mb = size_bytes / (1024 * 1024)
-            print(f"📏 ZIP size: {size_mb:.1f} MB")
+            safe_print(f"ZIP size: {safe_format_size(size_bytes)}")
         except:
             pass
         
@@ -76,12 +98,12 @@ Troubleshooting:
 For support, please refer to the documentation or contact support.
 """)
         
-        print(f"📋 Installation instructions created: {readme_path}")
+        safe_print(f"Installation instructions created: {readme_path}")
         
         return True
         
     except Exception as e:
-        print(f"❌ Failed to create ZIP: {e}")
+        safe_status(False, f"Failed to create ZIP: {e}")
         return False
 
 
