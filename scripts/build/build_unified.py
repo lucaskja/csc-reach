@@ -14,6 +14,15 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
+# Import build utilities
+try:
+    from build_cache_manager import BuildCacheManager
+    from artifact_manager import ArtifactManager
+except ImportError:
+    # Fallback if modules are not available
+    BuildCacheManager = None
+    ArtifactManager = None
+
 
 class Colors:
     """ANSI color codes for terminal output."""
@@ -38,6 +47,10 @@ class BuildManager:
         self.dist_dir = self.build_dir / 'dist'
         self.logs_dir = self.build_dir / 'logs'
         self.start_time = time.time()
+        
+        # Initialize cache and artifact managers
+        self.cache_manager = BuildCacheManager(project_root) if BuildCacheManager else None
+        self.artifact_manager = ArtifactManager(project_root) if ArtifactManager else None
         
         # Ensure directories exist
         self.logs_dir.mkdir(parents=True, exist_ok=True)
