@@ -1,0 +1,20 @@
+{
+  "enabled": true,
+  "name": "Code Quality Analyzer",
+  "description": "Monitors source code files for changes and provides automated code quality analysis including code smells, design patterns, and best practices suggestions",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "src/**/*.py",
+      "tests/**/*.py",
+      "scripts/**/*.py",
+      "build.py",
+      "setup.py"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Analyze the modified Python code for potential improvements. Focus on:\n\n1. **Code Smells**: Identify long methods, large classes, duplicate code, complex conditionals, and other maintainability issues\n2. **Design Patterns**: Suggest appropriate design patterns that could improve the code structure\n3. **Best Practices**: Check for PEP 8 compliance, proper error handling, documentation, type hints, and naming conventions\n4. **Performance**: Identify potential performance bottlenecks and suggest optimizations\n5. **Readability**: Suggest improvements for code clarity and maintainability\n6. **Architecture**: Evaluate adherence to the project's separation of concerns and modular design principles\n\nFor each suggestion, provide:\n- Clear explanation of the issue\n- Specific code examples showing the problem\n- Recommended solution with example implementation\n- Rationale for why the change improves code quality\n\nConsider the project context: This is a cross-platform desktop application (CSC-Reach) built with Python/PySide6 for bulk email communication, following a modular architecture with clear separation between GUI, business logic, and services."
+  }
+}

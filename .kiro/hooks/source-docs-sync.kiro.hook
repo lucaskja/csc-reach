@@ -1,0 +1,25 @@
+{
+  "enabled": true,
+  "name": "Source to Docs Sync",
+  "description": "Monitors all Python source files, configuration files, and build scripts for changes and automatically updates documentation in README.md and the docs folder to keep them synchronized with code changes",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "src/**/*.py",
+      "tests/**/*.py",
+      "scripts/**/*.py",
+      "build.py",
+      "setup.py",
+      "pyproject.toml",
+      "requirements.txt",
+      "Makefile",
+      "config/**/*.yaml",
+      "assets/templates/**/*.yaml"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Source code files have been modified in this Python project. Please analyze the changes and update the documentation accordingly. Focus on:\n\n1. Update README.md if there are significant feature changes, new dependencies, or architectural modifications\n2. Update relevant files in the /docs folder, particularly:\n   - docs/dev/ files for development-related changes\n   - docs/user/ files for user-facing feature changes\n   - docs/api/ files for API changes\n   - Create new summary files in docs/summaries/ for major changes\n\nConsider the project structure with core/, gui/, services/, and utils/ modules, and ensure documentation reflects any changes to the multichannel messaging application's functionality, build system, or configuration."
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "enabled": true,
+  "name": "Auto Commit & Push",
+  "description": "Automatically commits code changes using best practices and pushes to remote repository when a task is completed and all changes have been tested",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "src/**/*.py",
+      "tests/**/*.py",
+      "docs/**/*.md",
+      "pyproject.toml",
+      "requirements.txt",
+      "Makefile",
+      "build.py"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A task has been completed and code changes have been made. Please:\n\n1. Review all modified files to ensure they follow the project's coding standards and best practices\n2. Run the test suite to verify all tests pass: `make test` or `pytest`\n3. Check code quality with linting: `make lint` \n4. Verify the build still works: `make build`\n5. If all checks pass, create a meaningful commit message that describes what was accomplished\n6. Commit the changes using git with a descriptive message\n7. Push the changes to the remote repository\n\nOnly proceed with commit and push if:\n- All tests pass\n- Code follows project standards (Python 3.8+, PySide6, proper structure)\n- No linting errors\n- Build completes successfully\n- Changes are related to a completed task or feature\n\nUse conventional commit format: `type(scope): description` where type is feat/fix/docs/refactor/test/chore."
+  }
+}
