@@ -42,3 +42,6 @@ mypy>=1.5.0
 
 # Build tools
 pyinstaller>=5.13.0
+
+# System monitoring
+psutil>=5.9.0
