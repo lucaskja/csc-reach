@@ -8,6 +8,11 @@ from pathlib import Path
 from typing import List, Dict, Optional, Tuple, Any
 from io import StringIO
 
+try:
+    import chardet
+except ImportError:
+    chardet = None
+
 from .models import Customer
 from ..utils.exceptions import CSVProcessingError, ValidationError
 from ..utils.logger import get_logger
@@ -42,7 +47,24 @@ class CSVProcessor:
         Returns:
             Detected encoding
         """
-        import chardet
+        # Check if chardet is available
+        if chardet is None:
+            logger.warning("chardet module not available, using fallback encoding detection")
+            # Fallback encoding detection without chardet
+            for encoding in ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']:
+                try:
+                    with open(file_path, 'r', encoding=encoding) as test_f:
+                        test_f.read(1000)
+                    logger.debug(f"Using fallback encoding: {encoding}")
+                    self.detected_encoding = encoding
+                    return encoding
+                except UnicodeDecodeError:
+                    continue
+            
+            # If all else fails, use utf-8
+            logger.warning("Could not detect encoding, defaulting to utf-8")
+            self.detected_encoding = 'utf-8'
+            return 'utf-8'
         
         try:
             with open(file_path, 'rb') as f:
@@ -69,7 +91,20 @@ class CSVProcessor:
                 return encoding
                 
         except Exception as e:
-            logger.warning(f"Failed to detect encoding: {e}")
+            logger.warning(f"Failed to detect encoding with chardet: {e}")
+            # Fallback encoding detection without chardet
+            for encoding in ['utf-8', 'latin-1', 'cp1252', 'iso-8859-1']:
+                try:
+                    with open(file_path, 'r', encoding=encoding) as test_f:
+                        test_f.read(1000)
+                    logger.debug(f"Using fallback encoding: {encoding}")
+                    self.detected_encoding = encoding
+                    return encoding
+                except UnicodeDecodeError:
+                    continue
+            
+            # If all else fails, use utf-8
+            logger.warning("Could not detect encoding, defaulting to utf-8")
             self.detected_encoding = 'utf-8'
             return 'utf-8'
     

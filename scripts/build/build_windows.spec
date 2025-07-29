@@ -63,6 +63,8 @@ a = Analysis(
         'pandas',
         'yaml',
         'chardet',
+        'chardet.charsetprober',
+        'chardet.universaldetector',
         'colorlog',
         'cerberus',
         'babel',
@@ -70,7 +72,7 @@ a = Analysis(
         'pythoncom',
         'pywintypes',
     ],
-    hookspath=[],
+    hookspath=[str(project_root / 'scripts' / 'build')],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[

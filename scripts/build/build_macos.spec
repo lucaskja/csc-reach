@@ -67,7 +67,7 @@ a = Analysis(
         'ScriptingBridge',
         'Foundation',
     ],
-    hookspath=[],
+    hookspath=[str(project_root / 'scripts' / 'build')],
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
