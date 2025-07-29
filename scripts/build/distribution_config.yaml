@@ -1,0 +1,100 @@
+# Distribution Configuration for CSC-Reach
+# Defines how releases are distributed across different channels
+
+channels:
+  development:
+    description: "Development builds for internal testing and feature validation"
+    auto_deploy: true
+    retention_days: 7
+    destinations:
+      - type: github_releases
+        prerelease: true
+        draft: true
+      - type: local_storage
+        path: "build/dist/development"
+
+  staging:
+    description: "Staging builds for pre-production testing and QA"
+    auto_deploy: true
+    retention_days: 30
+    destinations:
+      - type: github_releases
+        prerelease: true
+        draft: false
+      - type: local_storage
+        path: "build/dist/staging"
+
+  production:
+    description: "Production releases for end users"
+    auto_deploy: false  # Requires manual approval
+    retention_days: 365
+    destinations:
+      - type: github_releases
+        prerelease: false
+        draft: false
+      - type: local_storage
+        path: "build/dist/production"
+
+# Asset validation rules
+assets:
+  required_patterns:
+    - "*Windows*.zip"      # Windows distribution package
+    - "*macOS*.dmg"        # macOS installer (preferred)
+  
+  optional_patterns:
+    - "*Windows*.exe"      # Windows executable
+    - "*macOS*.app"        # macOS application bundle
+    - "release-manifest.json"  # Release metadata
+    - "release-notes.md"   # Generated release notes
+    - "*.txt"              # Additional documentation
+
+# Notification settings
+notifications:
+  enabled: true
+  channels:
+    - console    # Console output
+    - file       # Log to file
+  
+  # Optional: Webhook for external notifications
+  webhook_url: null
+  
+  # Optional: Slack/Discord integration
+  slack_webhook: null
+  discord_webhook: null
+
+# Quality gates for releases
+quality_gates:
+  development:
+    require_tests: false
+    require_quality_checks: false
+    min_coverage: 0
+  
+  staging:
+    require_tests: true
+    require_quality_checks: true
+    min_coverage: 70
+  
+  production:
+    require_tests: true
+    require_quality_checks: true
+    min_coverage: 80
+    require_security_scan: true
+
+# Platform-specific settings
+platforms:
+  windows:
+    build_script: "scripts/build/build_windows.py"
+    package_formats: ["zip", "exe"]
+    sign_binaries: false  # Set to true when code signing is available
+  
+  macos:
+    build_script: "scripts/build/build_macos.py"
+    package_formats: ["dmg", "app"]
+    sign_binaries: false  # Set to true when code signing is available
+    notarize: false       # Set to true for App Store distribution
+
+# Cleanup policies
+cleanup:
+  auto_cleanup: true
+  keep_last_n_releases: 5
+  cleanup_schedule: "weekly"  # daily, weekly, monthly

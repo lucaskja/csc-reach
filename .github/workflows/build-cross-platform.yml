@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version tag (e.g., v1.0.0)'
+        description: 'Version tag (e.g., v1.0.0) - leave empty for auto-increment'
         required: false
-        default: 'latest'
+        default: ''
       release_type:
         description: 'Release type'
         required: false
@@ -16,6 +16,20 @@ on:
           - development
           - staging
           - production
+      increment_type:
+        description: 'Version increment (if version not specified)'
+        required: false
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      skip_tests:
+        description: 'Skip tests (not recommended for production)'
+        required: false
+        default: false
+        type: boolean
   push:
     tags:
       - 'v*'
@@ -77,6 +91,29 @@ jobs:
         python -m pip install --upgrade pip setuptools wheel
         pip install -r requirements.txt
         pip install -e .
+        
+    - name: Install Qt dependencies for Linux GUI testing
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          xvfb \
+          libgl1-mesa-glx \
+          libegl1-mesa \
+          libxrandr2 \
+          libxss1 \
+          libxcursor1 \
+          libxcomposite1 \
+          libasound2 \
+          libxi6 \
+          libxtst6 \
+          qt6-base-dev
+        
+    - name: Set up virtual display for GUI testing
+      run: |
+        export DISPLAY=:99
+        Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+        sleep 3
+        echo "DISPLAY=:99" >> $GITHUB_ENV
         
     - name: Run code quality checks
       run: |
@@ -571,55 +608,98 @@ jobs:
         retention-days: 30
         if-no-files-found: warn
 
-  # Job 4: Create release (only on tags or manual release)
+  # Job 4: Create release with enhanced automation
   create-release:
     needs: [build-windows, build-macos]
-    if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && github.event.inputs.release_type == 'production')
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch full history for release notes generation
       
+    - name: Set up Python for release automation
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install release automation dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyyaml requests
+        
     - name: Download all artifacts
       uses: actions/download-artifact@v4
       with:
         path: ./artifacts
         
-    - name: Prepare release assets
+    - name: Prepare release assets with automation
       run: |
-        echo "📦 Preparing release assets..."
+        echo "📦 Preparing release assets with enhanced automation..."
         mkdir -p ./release-assets
         
-        # Find and copy Windows ZIP
+        # Find and copy Windows assets
         find ./artifacts -name "*.zip" -type f -exec cp {} ./release-assets/ \;
+        find ./artifacts -name "*.exe" -type f -exec cp {} ./release-assets/ \;
         
-        # Find and copy macOS DMG
+        # Find and copy macOS assets
         find ./artifacts -name "*.dmg" -type f -exec cp {} ./release-assets/ \;
+        
+        # Copy any additional artifacts
+        find ./artifacts -name "*.json" -type f -exec cp {} ./release-assets/ \;
+        find ./artifacts -name "*.txt" -type f -exec cp {} ./release-assets/ \;
         
         # List prepared assets
         echo "Release assets prepared:"
         ls -la ./release-assets/
         
-    - name: Generate release notes
-      id: release-notes
+    - name: Determine version and release type
+      id: version-info
       run: |
-        echo "📝 Generating release notes..."
-        
-        # Get version from tag or input
+        # Determine version
         if [[ "${{ github.ref }}" == refs/tags/* ]]; then
           VERSION=${GITHUB_REF#refs/tags/}
+          VERSION=${VERSION#v}  # Remove 'v' prefix if present
+          RELEASE_TYPE="production"
         else
-          VERSION="${{ github.event.inputs.version || 'latest' }}"
+          VERSION="${{ github.event.inputs.version }}"
+          RELEASE_TYPE="${{ github.event.inputs.release_type || 'development' }}"
+          
+          # If no version specified, get from pyproject.toml and add timestamp
+          if [ -z "$VERSION" ] || [ "$VERSION" = "latest" ]; then
+            BASE_VERSION=$(python -c "import re; content=open('pyproject.toml').read(); print(re.search(r'version\s*=\s*[\"\\']([^\"\\']*)[\"\\'']', content).group(1))")
+            TIMESTAMP=$(date +"%Y%m%d-%H%M")
+            VERSION="${BASE_VERSION}-${RELEASE_TYPE}-${TIMESTAMP}"
+          fi
         fi
         
-        # Create release notes
-        cat > release-notes.md << EOF
-        # CSC-Reach $VERSION
+        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "RELEASE_TYPE=$RELEASE_TYPE" >> $GITHUB_OUTPUT
+        echo "Determined version: $VERSION, type: $RELEASE_TYPE"
+        
+    - name: Generate comprehensive release notes
+      id: release-notes
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        echo "📝 Generating comprehensive release notes..."
+        
+        # Use the enhanced release notes generator
+        python scripts/build/release_notes_generator.py \
+          --version "${{ steps.version-info.outputs.VERSION }}" \
+          --release-type "${{ steps.version-info.outputs.RELEASE_TYPE }}" \
+          --output ./release-assets/release-notes.md
+        
+        if [ ! -f "./release-assets/release-notes.md" ]; then
+          echo "❌ Failed to generate release notes, creating fallback"
+          cat > ./release-assets/release-notes.md << EOF
+        # CSC-Reach ${{ steps.version-info.outputs.VERSION }}
         
         ## 🚀 What's New
         
-        This release includes the latest improvements and bug fixes for CSC-Reach.
+        This ${{ steps.version-info.outputs.RELEASE_TYPE }} release includes the latest improvements and bug fixes.
         
         ## 📦 Downloads
         
@@ -629,22 +709,14 @@ jobs:
         ## 🔧 System Requirements
         
         ### Windows
-        - Windows 10 or later
+        - Windows 10 or later (64-bit)
         - Microsoft Outlook installed and configured
-        - 4GB RAM minimum
+        - 4GB RAM minimum, 8GB recommended
         
         ### macOS
-        - macOS 10.14 or later
+        - macOS 10.14 (Mojave) or later
         - Microsoft Outlook for Mac installed and configured
-        - 4GB RAM minimum
-        
-        ## 📋 Installation Instructions
-        
-        Detailed installation guides are available in the repository documentation.
-        
-        ## 🐛 Bug Reports
-        
-        If you encounter any issues, please report them in the GitHub Issues section.
+        - 4GB RAM minimum, 8GB recommended
         
         ---
         
@@ -653,21 +725,67 @@ jobs:
         - Commit: ${{ github.sha }}
         - Workflow: ${{ github.run_id }}
         EOF
+        fi
         
-        echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+        echo "✅ Release notes generated"
+        
+    - name: Create release manifest
+      run: |
+        echo "📋 Creating release manifest..."
+        
+        python scripts/build/release_manager.py \
+          --version "${{ steps.version-info.outputs.VERSION }}" \
+          --release-type "${{ steps.version-info.outputs.RELEASE_TYPE }}" \
+          --assets-dir ./release-assets
+        
+        echo "✅ Release manifest created"
+        
+    - name: Prepare distribution channels
+      run: |
+        echo "🚀 Preparing distribution channels..."
+        
+        python scripts/build/distribution_manager.py \
+          --channel "${{ steps.version-info.outputs.RELEASE_TYPE }}" \
+          --version "${{ steps.version-info.outputs.VERSION }}" \
+          --assets-dir ./release-assets \
+          --action deploy \
+          --dry-run
+        
+        echo "✅ Distribution channels prepared"
         
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: ${{ steps.release-notes.outputs.VERSION }}
-        name: CSC-Reach ${{ steps.release-notes.outputs.VERSION }}
-        body_path: release-notes.md
+        tag_name: v${{ steps.version-info.outputs.VERSION }}
+        name: CSC-Reach ${{ steps.version-info.outputs.VERSION }}
+        body_path: ./release-assets/release-notes.md
         files: ./release-assets/*
-        draft: false
-        prerelease: ${{ github.event.inputs.release_type != 'production' }}
-        generate_release_notes: true
+        draft: ${{ steps.version-info.outputs.RELEASE_TYPE == 'development' }}
+        prerelease: ${{ steps.version-info.outputs.RELEASE_TYPE != 'production' }}
+        generate_release_notes: false  # We generate our own
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Upload release artifacts for distribution
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-${{ steps.version-info.outputs.VERSION }}-${{ steps.version-info.outputs.RELEASE_TYPE }}
+        path: ./release-assets/
+        retention-days: ${{ steps.version-info.outputs.RELEASE_TYPE == 'production' && 365 || (steps.version-info.outputs.RELEASE_TYPE == 'staging' && 30 || 7) }}
+        
+    - name: Post-release notifications
+      if: always()
+      run: |
+        echo "📢 Post-release notifications"
+        
+        if [ "${{ job.status }}" = "success" ]; then
+          echo "✅ Release ${{ steps.version-info.outputs.VERSION }} created successfully!"
+          echo "   Type: ${{ steps.version-info.outputs.RELEASE_TYPE }}"
+          echo "   Assets: $(ls -1 ./release-assets/ | wc -l) files"
+          echo "   URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/v${{ steps.version-info.outputs.VERSION }}"
+        else
+          echo "❌ Release creation failed"
+        fi
 
   # Job 5: Comprehensive build verification and smoke testing
   test-builds:

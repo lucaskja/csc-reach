@@ -12,7 +12,8 @@
       "pyproject.toml",
       "requirements.txt",
       "Makefile",
-      "build.py"
+      "build.py",
+      "*.py"
     ]
   },
   "then": {
