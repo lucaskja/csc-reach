@@ -322,12 +322,31 @@ class WhatsAppWebService:
                 if self.auto_send:
                     logger.info(f"🤖 Attempting automatic send for {customer.name} ({phone})")
                     
-                    # Wait for page to load (configurable delay)
-                    logger.info(f"⏱️ Waiting {self.auto_send_delay} seconds for WhatsApp Web to load...")
-                    time.sleep(self.auto_send_delay)
+                    # Enhanced wait for page to load with progress indication
+                    base_delay = self.auto_send_delay
+                    if platform.system().lower() == "windows":
+                        # Windows needs extra time for reliable automation
+                        base_delay = max(base_delay, 6)  # Minimum 6 seconds for Windows
                     
-                    # Try to automatically send the message
-                    auto_send_success = self._auto_send_message()
+                    logger.info(f"⏱️ Waiting {base_delay} seconds for WhatsApp Web to load...")
+                    
+                    # Progressive wait with status updates
+                    for i in range(base_delay):
+                        time.sleep(1)
+                        if i == base_delay // 2:
+                            logger.info("⏱️ Halfway through loading wait...")
+                        elif i == base_delay - 2:
+                            logger.info("⏱️ Almost ready for auto-send...")
+                    
+                    # Verify WhatsApp Web is ready before attempting auto-send
+                    if self._verify_whatsapp_web_ready():
+                        logger.info("✅ WhatsApp Web is ready for auto-send")
+                        # Try to automatically send the message
+                        auto_send_success = self._auto_send_message()
+                    else:
+                        logger.warning("⚠️ WhatsApp Web not ready, attempting auto-send anyway...")
+                        # Try anyway, but with lower expectations
+                        auto_send_success = self._auto_send_message()
                     
                     if auto_send_success:
                         logger.info(f"✅ WhatsApp message automatically sent to {customer.name} ({phone})")
@@ -523,238 +542,277 @@ class WhatsAppWebService:
             return False
     
     def _auto_send_javascript_windows(self) -> bool:
-        """Enhanced auto-send using JavaScript on Windows via PowerShell and Chrome DevTools."""
+        """Robust Windows auto-send using multiple reliable methods."""
         try:
-            # Enhanced PowerShell script with multiple fallback methods
+            logger.info("🔧 Starting Windows auto-send process...")
+            
+            # Method 1: Try Chrome DevTools API (most reliable when available)
+            if self._try_chrome_devtools_send():
+                logger.info("✅ Windows auto-send successful via Chrome DevTools")
+                return True
+            
+            # Method 2: Try UI Automation with precise element detection
+            if self._try_ui_automation_send():
+                logger.info("✅ Windows auto-send successful via UI Automation")
+                return True
+            
+            # Method 3: Try keyboard automation with window focus
+            if self._try_keyboard_automation_send():
+                logger.info("✅ Windows auto-send successful via Keyboard Automation")
+                return True
+            
+            # Method 4: Try simple Enter key as final fallback
+            if self._try_simple_enter_send():
+                logger.info("✅ Windows auto-send successful via Simple Enter")
+                return True
+            
+            logger.warning("⚠️ All Windows auto-send methods failed")
+            return False
+            
+        except Exception as e:
+            logger.error(f"Windows auto-send failed: {e}")
+            return False
+    
+    def _try_chrome_devtools_send(self) -> bool:
+        """Try sending via Chrome DevTools API."""
+        try:
             powershell_script = '''
-            Add-Type -AssemblyName System.Windows.Forms
-            Add-Type -AssemblyName System.Drawing
-            
-            # Enhanced Chrome process detection
-            function Find-ChromeWithWhatsApp {
-                $chromeProcesses = Get-Process -Name "chrome" -ErrorAction SilentlyContinue
-                $whatsappProcesses = @()
+            try {
+                # Try common DevTools ports
+                $ports = @(9222, 9223, 9224, 9225)
                 
-                foreach ($proc in $chromeProcesses) {
+                foreach ($port in $ports) {
                     try {
-                        if ($proc.MainWindowTitle -like "*WhatsApp*" -and $proc.MainWindowHandle -ne 0) {
-                            $whatsappProcesses += $proc
-                        }
-                    } catch {}
-                }
-                
-                return $whatsappProcesses
-            }
-            
-            # Enhanced DevTools communication
-            function Invoke-ChromeDevTools {
-                param($jsCode)
-                
-                try {
-                    # Try multiple DevTools ports (Chrome can use different ports)
-                    $ports = @(9222, 9223, 9224)
-                    
-                    foreach ($port in $ports) {
-                        try {
-                            $response = Invoke-RestMethod -Uri "http://localhost:$port/json" -Method Get -ErrorAction SilentlyContinue -TimeoutSec 2
-                            if ($response) {
-                                $whatsappTab = $response | Where-Object { 
-                                    $_.title -like "*WhatsApp*" -or $_.url -like "*web.whatsapp.com*" 
-                                } | Select-Object -First 1
-                                
-                                if ($whatsappTab) {
-                                    # Use Runtime.evaluate API
-                                    $evalUrl = "http://localhost:$port/json/runtime/evaluate"
-                                    $body = @{
-                                        expression = $jsCode
-                                        returnByValue = $true
-                                        awaitPromise = $false
-                                    } | ConvertTo-Json -Depth 3
-                                    
-                                    $headers = @{
-                                        'Content-Type' = 'application/json'
-                                        'Target' = $whatsappTab.id
-                                    }
-                                    
-                                    $result = Invoke-RestMethod -Uri $evalUrl -Method Post -Body $body -Headers $headers -ErrorAction SilentlyContinue -TimeoutSec 3
-                                    
-                                    if ($result.result.value -eq "SUCCESS" -or $result.result.value -eq "FALLBACK") {
-                                        Write-Host "DevTools success on port $port"
-                                        return $true
+                        $tabs = Invoke-RestMethod -Uri "http://localhost:$port/json" -TimeoutSec 2 -ErrorAction SilentlyContinue
+                        $whatsappTab = $tabs | Where-Object { $_.title -like "*WhatsApp*" -or $_.url -like "*web.whatsapp.com*" } | Select-Object -First 1
+                        
+                        if ($whatsappTab) {
+                            # Execute JavaScript to click send button
+                            $jsCode = @"
+                                // Find and click send button
+                                const sendButton = document.querySelector('button[aria-label*="Send"], button[data-testid="send"], [role="button"][aria-label*="Send"]');
+                                if (sendButton && sendButton.offsetParent !== null) {
+                                    sendButton.click();
+                                    'SENT';
+                                } else {
+                                    // Try Enter key on message input
+                                    const messageInput = document.querySelector('[contenteditable="true"], [data-testid="conversation-compose-box-input"]');
+                                    if (messageInput) {
+                                        messageInput.focus();
+                                        const event = new KeyboardEvent('keydown', { key: 'Enter', keyCode: 13, which: 13, bubbles: true });
+                                        messageInput.dispatchEvent(event);
+                                        'ENTER_SENT';
+                                    } else {
+                                        'NO_ELEMENTS';
                                     }
                                 }
-                            }
-                        } catch {
-                            # Try next port
-                            continue
-                        }
-                    }
-                } catch {}
-                
-                return $false
-            }
-            
-            # Enhanced JavaScript code for WhatsApp Web
-            $jsCode = @"
-                (function() {
-                    try {
-                        // Wait for page to be fully loaded
-                        if (document.readyState !== 'complete') {
-                            return 'PAGE_NOT_READY';
-                        }
-                        
-                        // Multiple selectors for send button (WhatsApp updates frequently)
-                        const sendSelectors = [
-                            'button[aria-label*="Send"]',
-                            'button[data-testid="send"]',
-                            'button span[data-icon="send"]',
-                            'button span[data-icon="wds-ic-send-filled"]',
-                            '[role="button"][aria-label*="Send"]',
-                            'button[title*="Send"]',
-                            'div[role="button"][aria-label*="Send"]'
-                        ];
-                        
-                        let sendBtn = null;
-                        for (const selector of sendSelectors) {
-                            sendBtn = document.querySelector(selector);
-                            if (sendBtn) break;
-                        }
-                        
-                        if (sendBtn && sendBtn.offsetParent !== null) {
-                            // Ensure button is visible and clickable
-                            sendBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            
-                            // Simulate human-like click
-                            const rect = sendBtn.getBoundingClientRect();
-                            const clickEvent = new MouseEvent('click', {
-                                view: window,
-                                bubbles: true,
-                                cancelable: true,
-                                clientX: rect.left + rect.width / 2,
-                                clientY: rect.top + rect.height / 2
-                            });
-                            
-                            sendBtn.dispatchEvent(clickEvent);
-                            
-                            // Also try direct click as backup
-                            setTimeout(() => sendBtn.click(), 100);
-                            
-                            return 'SUCCESS';
-                        } else {
-                            // Fallback: Try Enter key on message input
-                            const messageSelectors = [
-                                '[contenteditable="true"][data-testid="conversation-compose-box-input"]',
-                                '[contenteditable="true"]',
-                                'div[role="textbox"]',
-                                '[data-testid="conversation-compose-box-input"]'
-                            ];
-                            
-                            let messageBox = null;
-                            for (const selector of messageSelectors) {
-                                messageBox = document.querySelector(selector);
-                                if (messageBox) break;
-                            }
-                            
-                            if (messageBox) {
-                                messageBox.focus();
-                                
-                                // Simulate Enter key press
-                                const enterEvent = new KeyboardEvent('keydown', {
-                                    key: 'Enter',
-                                    keyCode: 13,
-                                    which: 13,
-                                    bubbles: true,
-                                    cancelable: true
-                                });
-                                
-                                messageBox.dispatchEvent(enterEvent);
-                                
-                                return 'FALLBACK';
-                            } else {
-                                return 'NO_ELEMENTS_FOUND';
-                            }
-                        }
-                    } catch (error) {
-                        return 'ERROR: ' + error.message;
-                    }
-                })();
 "@
-            
-            # Find Chrome processes with WhatsApp
-            $chromeProcesses = Find-ChromeWithWhatsApp
-            
-            if ($chromeProcesses.Count -gt 0) {
-                # Bring Chrome to front
-                $chromeProcess = $chromeProcesses[0]
-                [System.Windows.Forms.Application]::SetForegroundWindow($chromeProcess.MainWindowHandle)
-                
-                # Wait for window to be active
-                Start-Sleep -Milliseconds 800
-                
-                # Try DevTools first (most reliable)
-                $devToolsSuccess = Invoke-ChromeDevTools -jsCode $jsCode
-                
-                if ($devToolsSuccess) {
-                    Write-Host "SUCCESS_DEVTOOLS"
-                    return $true
+                            
+                            $body = @{ expression = $jsCode } | ConvertTo-Json
+                            $result = Invoke-RestMethod -Uri "http://localhost:$port/json/runtime/evaluate" -Method Post -Body $body -ContentType "application/json" -TimeoutSec 3 -ErrorAction SilentlyContinue
+                            
+                            if ($result.result.value -eq "SENT" -or $result.result.value -eq "ENTER_SENT") {
+                                Write-Host "DEVTOOLS_SUCCESS"
+                                return $true
+                            }
+                        }
+                    } catch {
+                        continue
+                    }
                 }
                 
-                # Fallback to keyboard simulation
-                Write-Host "DevTools failed, trying keyboard simulation..."
-                
-                # Focus on the Chrome window first
-                [System.Windows.Forms.Application]::SetForegroundWindow($chromeProcess.MainWindowHandle)
-                Start-Sleep -Milliseconds 500
-                
-                # Try multiple key combinations
-                [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
-                Start-Sleep -Milliseconds 200
-                
-                # Backup: Ctrl+Enter (sometimes needed for WhatsApp Web)
-                [System.Windows.Forms.SendKeys]::SendWait("^{ENTER}")
-                Start-Sleep -Milliseconds 200
-                
-                # Final backup: Tab to send button and press Enter
-                [System.Windows.Forms.SendKeys]::SendWait("{TAB}")
-                Start-Sleep -Milliseconds 100
-                [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
-                
-                Write-Host "SUCCESS_KEYBOARD"
-                return $true
-            } else {
-                Write-Host "NO_CHROME_WHATSAPP_FOUND"
+                Write-Host "DEVTOOLS_FAILED"
+                return $false
+            } catch {
+                Write-Host "DEVTOOLS_ERROR"
                 return $false
             }
             '''
             
-            result = subprocess.run(
-                ["powershell", "-ExecutionPolicy", "Bypass", "-Command", powershell_script],
-                capture_output=True,
-                text=True,
-                timeout=15
-            )
+            result = subprocess.run([
+                "powershell", "-ExecutionPolicy", "Bypass", "-Command", powershell_script
+            ], capture_output=True, text=True, timeout=10)
             
-            success = result.returncode == 0 and ("SUCCESS_DEVTOOLS" in result.stdout or "SUCCESS_KEYBOARD" in result.stdout)
+            return result.returncode == 0 and "DEVTOOLS_SUCCESS" in result.stdout
             
-            if success:
-                if "SUCCESS_DEVTOOLS" in result.stdout:
-                    logger.info("✅ Windows JavaScript auto-send successful (DevTools)")
-                else:
-                    logger.info("✅ Windows JavaScript auto-send successful (Keyboard)")
-            else:
-                logger.warning(f"⚠️ Windows JavaScript auto-send failed")
-                if "NO_CHROME_WHATSAPP_FOUND" in result.stdout:
-                    logger.info("💡 No Chrome window with WhatsApp found")
-                elif result.stderr:
-                    logger.debug(f"PowerShell error: {result.stderr}")
-            
-            return success
-            
-        except subprocess.TimeoutExpired:
-            logger.error("Windows JavaScript auto-send timed out")
-            return False
         except Exception as e:
-            logger.error(f"JavaScript Windows auto-send failed: {e}")
+            logger.debug(f"Chrome DevTools method failed: {e}")
+            return False
+    
+    def _try_ui_automation_send(self) -> bool:
+        """Try sending via Windows UI Automation."""
+        try:
+            powershell_script = '''
+            Add-Type -AssemblyName System.Windows.Forms
+            Add-Type -AssemblyName UIAutomationClient
+            
+            try {
+                # Find Chrome window with WhatsApp
+                $chromeProcesses = Get-Process -Name "chrome" -ErrorAction SilentlyContinue | Where-Object { 
+                    $_.MainWindowTitle -like "*WhatsApp*" -and $_.MainWindowHandle -ne 0 
+                }
+                
+                if ($chromeProcesses) {
+                    $chromeProcess = $chromeProcesses[0]
+                    
+                    # Bring window to front
+                    [System.Windows.Forms.Application]::SetForegroundWindow($chromeProcess.MainWindowHandle)
+                    Start-Sleep -Milliseconds 1000
+                    
+                    # Get window position for click calculation
+                    Add-Type @"
+                        using System;
+                        using System.Runtime.InteropServices;
+                        public class Win32 {
+                            [DllImport("user32.dll")]
+                            public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+                            [StructLayout(LayoutKind.Sequential)]
+                            public struct RECT { public int Left, Top, Right, Bottom; }
+                        }
+"@
+                    
+                    $rect = New-Object Win32+RECT
+                    [Win32]::GetWindowRect($chromeProcess.MainWindowHandle, [ref]$rect)
+                    
+                    # Calculate send button position (bottom right area)
+                    $windowWidth = $rect.Right - $rect.Left
+                    $windowHeight = $rect.Bottom - $rect.Top
+                    $sendButtonX = $rect.Left + ($windowWidth * 0.95)
+                    $sendButtonY = $rect.Top + ($windowHeight * 0.85)
+                    
+                    # Move mouse and click
+                    [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point($sendButtonX, $sendButtonY)
+                    Start-Sleep -Milliseconds 200
+                    
+                    # Simulate click
+                    Add-Type -TypeDefinition @"
+                        using System.Runtime.InteropServices;
+                        public class MouseClick {
+                            [DllImport("user32.dll")]
+                            public static extern void mouse_event(uint dwFlags, uint dx, uint dy, uint dwData, int dwExtraInfo);
+                            public const uint MOUSEEVENTF_LEFTDOWN = 0x02;
+                            public const uint MOUSEEVENTF_LEFTUP = 0x04;
+                        }
+"@
+                    
+                    [MouseClick]::mouse_event(2, 0, 0, 0, 0)  # Mouse down
+                    Start-Sleep -Milliseconds 50
+                    [MouseClick]::mouse_event(4, 0, 0, 0, 0)  # Mouse up
+                    
+                    Write-Host "UI_AUTOMATION_SUCCESS"
+                    return $true
+                } else {
+                    Write-Host "NO_WHATSAPP_WINDOW"
+                    return $false
+                }
+            } catch {
+                Write-Host "UI_AUTOMATION_ERROR"
+                return $false
+            }
+            '''
+            
+            result = subprocess.run([
+                "powershell", "-ExecutionPolicy", "Bypass", "-Command", powershell_script
+            ], capture_output=True, text=True, timeout=8)
+            
+            return result.returncode == 0 and "UI_AUTOMATION_SUCCESS" in result.stdout
+            
+        except Exception as e:
+            logger.debug(f"UI Automation method failed: {e}")
+            return False
+    
+    def _try_keyboard_automation_send(self) -> bool:
+        """Try sending via keyboard automation with proper window focus."""
+        try:
+            powershell_script = '''
+            Add-Type -AssemblyName System.Windows.Forms
+            
+            try {
+                # Find and focus Chrome with WhatsApp
+                $chromeProcesses = Get-Process -Name "chrome" -ErrorAction SilentlyContinue | Where-Object { 
+                    $_.MainWindowTitle -like "*WhatsApp*" -and $_.MainWindowHandle -ne 0 
+                }
+                
+                if ($chromeProcesses) {
+                    $chromeProcess = $chromeProcesses[0]
+                    
+                    # Ensure window is active and focused
+                    [System.Windows.Forms.Application]::SetForegroundWindow($chromeProcess.MainWindowHandle)
+                    Start-Sleep -Milliseconds 800
+                    
+                    # Try multiple keyboard sequences
+                    # Method 1: Direct Enter
+                    [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
+                    Start-Sleep -Milliseconds 300
+                    
+                    # Method 2: Ctrl+Enter (WhatsApp Web sometimes uses this)
+                    [System.Windows.Forms.SendKeys]::SendWait("^{ENTER}")
+                    Start-Sleep -Milliseconds 300
+                    
+                    # Method 3: Tab to send button then Enter
+                    [System.Windows.Forms.SendKeys]::SendWait("{TAB}{ENTER}")
+                    Start-Sleep -Milliseconds 300
+                    
+                    Write-Host "KEYBOARD_SUCCESS"
+                    return $true
+                } else {
+                    Write-Host "NO_CHROME_PROCESS"
+                    return $false
+                }
+            } catch {
+                Write-Host "KEYBOARD_ERROR"
+                return $false
+            }
+            '''
+            
+            result = subprocess.run([
+                "powershell", "-ExecutionPolicy", "Bypass", "-Command", powershell_script
+            ], capture_output=True, text=True, timeout=6)
+            
+            return result.returncode == 0 and "KEYBOARD_SUCCESS" in result.stdout
+            
+        except Exception as e:
+            logger.debug(f"Keyboard automation method failed: {e}")
+            return False
+    
+    def _try_simple_enter_send(self) -> bool:
+        """Try simple Enter key as final fallback."""
+        try:
+            powershell_script = '''
+            Add-Type -AssemblyName System.Windows.Forms
+            
+            try {
+                # Find any Chrome process
+                $chromeProcesses = Get-Process -Name "chrome" -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 }
+                
+                if ($chromeProcesses) {
+                    # Focus first Chrome window
+                    [System.Windows.Forms.Application]::SetForegroundWindow($chromeProcesses[0].MainWindowHandle)
+                    Start-Sleep -Milliseconds 500
+                    
+                    # Simple Enter key
+                    [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
+                    
+                    Write-Host "SIMPLE_ENTER_SUCCESS"
+                    return $true
+                } else {
+                    Write-Host "NO_CHROME"
+                    return $false
+                }
+            } catch {
+                Write-Host "SIMPLE_ENTER_ERROR"
+                return $false
+            }
+            '''
+            
+            result = subprocess.run([
+                "powershell", "-ExecutionPolicy", "Bypass", "-Command", powershell_script
+            ], capture_output=True, text=True, timeout=4)
+            
+            return result.returncode == 0 and "SIMPLE_ENTER_SUCCESS" in result.stdout
+            
+        except Exception as e:
+            logger.debug(f"Simple Enter method failed: {e}")
             return False
     
     def _auto_send_macos(self) -> bool:
@@ -898,269 +956,231 @@ class WhatsAppWebService:
             return False
     
     def _auto_send_windows(self) -> bool:
-        """Enhanced auto-send message on Windows using advanced PowerShell automation."""
+        """Reliable Windows auto-send using focused approach."""
         try:
-            # Advanced PowerShell script with comprehensive Windows automation
+            logger.info("🔧 Starting reliable Windows auto-send...")
+            
+            # Step 1: Find and focus WhatsApp Chrome window
+            if not self._focus_whatsapp_window():
+                logger.warning("Could not find or focus WhatsApp window")
+                return False
+            
+            # Step 2: Wait for window to be ready
+            time.sleep(1.5)  # Give WhatsApp Web time to be ready
+            
+            # Step 3: Try multiple sending methods in order of reliability
+            methods = [
+                ("Smart Click + Enter", self._windows_smart_click_send),
+                ("Keyboard Automation", self._windows_keyboard_send),
+                ("Simple Enter", self._windows_simple_enter)
+            ]
+            
+            for method_name, method_func in methods:
+                try:
+                    logger.info(f"🔧 Trying {method_name}...")
+                    if method_func():
+                        logger.info(f"✅ Windows auto-send successful via {method_name}")
+                        return True
+                    else:
+                        logger.debug(f"⚠️ {method_name} failed, trying next method...")
+                except Exception as e:
+                    logger.debug(f"⚠️ {method_name} error: {e}")
+                    continue
+            
+            logger.warning("⚠️ All Windows auto-send methods failed")
+            return False
+            
+        except Exception as e:
+            logger.error(f"Windows auto-send failed: {e}")
+            return False
+    
+    def _focus_whatsapp_window(self) -> bool:
+        """Focus the WhatsApp Chrome window."""
+        try:
+            powershell_script = '''
+            Add-Type -AssemblyName System.Windows.Forms
+            
+            # Find Chrome processes with WhatsApp
+            $chromeProcesses = Get-Process -Name "chrome" -ErrorAction SilentlyContinue | Where-Object { 
+                $_.MainWindowTitle -like "*WhatsApp*" -and $_.MainWindowHandle -ne 0 
+            }
+            
+            if ($chromeProcesses) {
+                $chromeProcess = $chromeProcesses[0]
+                
+                # Bring window to front and focus
+                [System.Windows.Forms.Application]::SetForegroundWindow($chromeProcess.MainWindowHandle)
+                
+                # Ensure window is restored if minimized
+                Add-Type @"
+                    using System;
+                    using System.Runtime.InteropServices;
+                    public class Win32 {
+                        [DllImport("user32.dll")]
+                        public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+                        public const int SW_RESTORE = 9;
+                    }
+"@
+                [Win32]::ShowWindow($chromeProcess.MainWindowHandle, 9)
+                
+                Write-Host "WINDOW_FOCUSED"
+                return $true
+            } else {
+                Write-Host "NO_WHATSAPP_WINDOW"
+                return $false
+            }
+            '''
+            
+            result = subprocess.run([
+                "powershell", "-ExecutionPolicy", "Bypass", "-Command", powershell_script
+            ], capture_output=True, text=True, timeout=5)
+            
+            return result.returncode == 0 and "WINDOW_FOCUSED" in result.stdout
+            
+        except Exception as e:
+            logger.debug(f"Window focus failed: {e}")
+            return False
+    
+    def _windows_smart_click_send(self) -> bool:
+        """Try smart click on send button area."""
+        try:
             powershell_script = '''
             Add-Type -AssemblyName System.Windows.Forms
             Add-Type -AssemblyName System.Drawing
-            Add-Type -AssemblyName UIAutomationClient
             
-            # Enhanced Windows API integration
-            Add-Type @"
-                using System;
-                using System.Runtime.InteropServices;
-                using System.Text;
+            # Get the focused Chrome window
+            $chromeProcesses = Get-Process -Name "chrome" -ErrorAction SilentlyContinue | Where-Object { 
+                $_.MainWindowTitle -like "*WhatsApp*" -and $_.MainWindowHandle -ne 0 
+            }
+            
+            if ($chromeProcesses) {
+                $chromeProcess = $chromeProcesses[0]
                 
-                public class Win32API {
-                    [DllImport("user32.dll")]
-                    public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
-                    
-                    [DllImport("user32.dll")]
-                    public static extern bool SetForegroundWindow(IntPtr hWnd);
-                    
-                    [DllImport("user32.dll")]
-                    public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-                    
-                    [DllImport("user32.dll")]
-                    public static extern bool IsWindowVisible(IntPtr hWnd);
-                    
-                    [DllImport("user32.dll")]
-                    public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
-                    
-                    [DllImport("user32.dll")]
-                    public static extern bool EnumWindows(EnumWindowsProc enumProc, IntPtr lParam);
-                    
-                    [DllImport("user32.dll")]
-                    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
-                    
-                    [DllImport("user32.dll")]
-                    public static extern void mouse_event(uint dwFlags, uint dx, uint dy, uint dwData, int dwExtraInfo);
-                    
-                    public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
-                    
-                    public const uint MOUSEEVENTF_LEFTDOWN = 0x02;
-                    public const uint MOUSEEVENTF_LEFTUP = 0x04;
-                    public const int SW_RESTORE = 9;
-                    public const int SW_SHOW = 5;
-                    
-                    [StructLayout(LayoutKind.Sequential)]
-                    public struct RECT {
-                        public int Left, Top, Right, Bottom;
+                # Get window rectangle
+                Add-Type @"
+                    using System;
+                    using System.Runtime.InteropServices;
+                    public class Win32 {
+                        [DllImport("user32.dll")]
+                        public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+                        [StructLayout(LayoutKind.Sequential)]
+                        public struct RECT { public int Left, Top, Right, Bottom; }
                     }
-                }
 "@
-            
-            # Enhanced Chrome window detection
-            function Find-WhatsAppChromeWindow {
-                $chromeProcesses = Get-Process -Name "chrome" -ErrorAction SilentlyContinue
-                $whatsappWindows = @()
                 
-                foreach ($proc in $chromeProcesses) {
-                    try {
-                        if ($proc.MainWindowHandle -ne 0) {
-                            $windowTitle = New-Object System.Text.StringBuilder 256
-                            [Win32API]::GetWindowText($proc.MainWindowHandle, $windowTitle, 256)
-                            $title = $windowTitle.ToString()
-                            
-                            if ($title -like "*WhatsApp*" -or $title -like "*web.whatsapp.com*") {
-                                $whatsappWindows += @{
-                                    Process = $proc
-                                    Handle = $proc.MainWindowHandle
-                                    Title = $title
-                                    Visible = [Win32API]::IsWindowVisible($proc.MainWindowHandle)
-                                }
-                            }
-                        }
-                    } catch {}
-                }
+                $rect = New-Object Win32+RECT
+                [Win32]::GetWindowRect($chromeProcess.MainWindowHandle, [ref]$rect)
                 
-                # Sort by visibility and title relevance
-                return $whatsappWindows | Sort-Object @{Expression={$_.Visible}; Descending=$true}, @{Expression={$_.Title -like "*WhatsApp*"}; Descending=$true}
-            }
-            
-            # Enhanced window activation
-            function Activate-ChromeWindow {
-                param($windowInfo)
+                # Calculate send button position (bottom-right area)
+                $windowWidth = $rect.Right - $rect.Left
+                $windowHeight = $rect.Bottom - $rect.Top
+                $clickX = $rect.Left + ($windowWidth * 0.92)  # 92% from left
+                $clickY = $rect.Top + ($windowHeight * 0.85)   # 85% from top
                 
-                try {
-                    # Restore window if minimized
-                    [Win32API]::ShowWindow($windowInfo.Handle, [Win32API]::SW_RESTORE)
-                    Start-Sleep -Milliseconds 200
-                    
-                    # Bring to foreground
-                    [Win32API]::SetForegroundWindow($windowInfo.Handle)
-                    Start-Sleep -Milliseconds 300
-                    
-                    # Verify it's active
-                    $activeWindow = [System.Windows.Forms.Application]::ActiveForm
-                    return $true
-                } catch {
-                    return $false
-                }
-            }
-            
-            # Smart click position calculation
-            function Get-SendButtonPosition {
-                param($windowHandle)
+                # Move mouse and click
+                [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point($clickX, $clickY)
+                Start-Sleep -Milliseconds 200
                 
-                $rect = New-Object Win32API+RECT
-                $success = [Win32API]::GetWindowRect($windowHandle, [ref]$rect)
-                
-                if ($success) {
-                    $windowWidth = $rect.Right - $rect.Left
-                    $windowHeight = $rect.Bottom - $rect.Top
-                    
-                    # Multiple potential send button positions
-                    $positions = @(
-                        @{ X = $rect.Left + ($windowWidth * 0.95); Y = $rect.Top + ($windowHeight * 0.85); Name = "Bottom-right (send button)" },
-                        @{ X = $rect.Left + ($windowWidth * 0.90); Y = $rect.Top + ($windowHeight * 0.85); Name = "Bottom-right-center" },
-                        @{ X = $rect.Left + ($windowWidth * 0.85); Y = $rect.Top + ($windowHeight * 0.85); Name = "Bottom-center-right" },
-                        @{ X = $rect.Left + ($windowWidth * 0.50); Y = $rect.Top + ($windowHeight * 0.85); Name = "Bottom-center (message box)" }
-                    )
-                    
-                    return $positions
-                }
-                
-                return @()
-            }
-            
-            # Enhanced mouse automation
-            function Send-SmartClick {
-                param($x, $y, $description)
-                
-                try {
-                    # Move mouse smoothly
-                    $currentPos = [System.Windows.Forms.Cursor]::Position
-                    $steps = 5
-                    
-                    for ($i = 1; $i -le $steps; $i++) {
-                        $newX = $currentPos.X + (($x - $currentPos.X) * $i / $steps)
-                        $newY = $currentPos.Y + (($y - $currentPos.Y) * $i / $steps)
-                        [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point($newX, $newY)
-                        Start-Sleep -Milliseconds 20
+                # Perform click
+                Add-Type -TypeDefinition @"
+                    using System.Runtime.InteropServices;
+                    public class Mouse {
+                        [DllImport("user32.dll")]
+                        public static extern void mouse_event(uint dwFlags, uint dx, uint dy, uint dwData, int dwExtraInfo);
+                        public const uint LEFTDOWN = 0x02;
+                        public const uint LEFTUP = 0x04;
                     }
-                    
-                    # Perform click
-                    [Win32API]::mouse_event([Win32API]::MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
-                    Start-Sleep -Milliseconds 50
-                    [Win32API]::mouse_event([Win32API]::MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
-                    
-                    Write-Host "Clicked at $description ($x, $y)"
-                    return $true
-                } catch {
-                    Write-Host "Click failed at $description"
-                    return $false
-                }
-            }
-            
-            # Main execution
-            Write-Host "Starting enhanced Windows WhatsApp automation..."
-            
-            # Find WhatsApp Chrome windows
-            $whatsappWindows = Find-WhatsAppChromeWindow
-            
-            if ($whatsappWindows.Count -eq 0) {
-                Write-Host "NO_WHATSAPP_WINDOWS"
+"@
+                
+                [Mouse]::mouse_event(2, 0, 0, 0, 0)  # Left down
+                Start-Sleep -Milliseconds 50
+                [Mouse]::mouse_event(4, 0, 0, 0, 0)  # Left up
+                
+                # Follow up with Enter key
+                Start-Sleep -Milliseconds 200
+                [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
+                
+                Write-Host "SMART_CLICK_SUCCESS"
+                return $true
+            } else {
+                Write-Host "NO_WINDOW"
                 return $false
             }
+            '''
             
-            # Use the best window
-            $targetWindow = $whatsappWindows[0]
-            Write-Host "Found WhatsApp window: $($targetWindow.Title)"
+            result = subprocess.run([
+                "powershell", "-ExecutionPolicy", "Bypass", "-Command", powershell_script
+            ], capture_output=True, text=True, timeout=6)
             
-            # Activate the window
-            $activated = Activate-ChromeWindow -windowInfo $targetWindow
-            if (-not $activated) {
-                Write-Host "WINDOW_ACTIVATION_FAILED"
+            return result.returncode == 0 and "SMART_CLICK_SUCCESS" in result.stdout
+            
+        except Exception as e:
+            logger.debug(f"Smart click failed: {e}")
+            return False
+    
+    def _windows_keyboard_send(self) -> bool:
+        """Try keyboard automation."""
+        try:
+            powershell_script = '''
+            Add-Type -AssemblyName System.Windows.Forms
+            
+            # Ensure Chrome is focused
+            $chromeProcesses = Get-Process -Name "chrome" -ErrorAction SilentlyContinue | Where-Object { 
+                $_.MainWindowTitle -like "*WhatsApp*" -and $_.MainWindowHandle -ne 0 
+            }
+            
+            if ($chromeProcesses) {
+                [System.Windows.Forms.Application]::SetForegroundWindow($chromeProcesses[0].MainWindowHandle)
+                Start-Sleep -Milliseconds 500
+                
+                # Try different key combinations
+                [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
+                Start-Sleep -Milliseconds 200
+                
+                [System.Windows.Forms.SendKeys]::SendWait("^{ENTER}")
+                Start-Sleep -Milliseconds 200
+                
+                [System.Windows.Forms.SendKeys]::SendWait("{TAB}{ENTER}")
+                
+                Write-Host "KEYBOARD_SUCCESS"
+                return $true
+            } else {
+                Write-Host "NO_WINDOW"
                 return $false
             }
+            '''
             
-            # Wait for window to be fully active
-            Start-Sleep -Milliseconds 800
+            result = subprocess.run([
+                "powershell", "-ExecutionPolicy", "Bypass", "-Command", powershell_script
+            ], capture_output=True, text=True, timeout=5)
             
-            # Get potential click positions
-            $positions = Get-SendButtonPosition -windowHandle $targetWindow.Handle
+            return result.returncode == 0 and "KEYBOARD_SUCCESS" in result.stdout
             
-            if ($positions.Count -gt 0) {
-                # Try clicking on send button area first
-                $sendButtonPos = $positions[0]
-                $clickSuccess = Send-SmartClick -x $sendButtonPos.X -y $sendButtonPos.Y -description $sendButtonPos.Name
-                
-                if ($clickSuccess) {
-                    Start-Sleep -Milliseconds 300
-                }
-                
-                # Try message box area as backup
-                if ($positions.Count -gt 3) {
-                    $messageBoxPos = $positions[3]
-                    Send-SmartClick -x $messageBoxPos.X -y $messageBoxPos.Y -description $messageBoxPos.Name
-                    Start-Sleep -Milliseconds 200
-                }
-            }
+        except Exception as e:
+            logger.debug(f"Keyboard automation failed: {e}")
+            return False
+    
+    def _windows_simple_enter(self) -> bool:
+        """Try simple Enter key."""
+        try:
+            powershell_script = '''
+            Add-Type -AssemblyName System.Windows.Forms
             
-            # Enhanced keyboard automation
-            Write-Host "Sending keyboard commands..."
+            # Simple Enter key press
+            [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
             
-            # Ensure window is still focused
-            [Win32API]::SetForegroundWindow($targetWindow.Handle)
-            Start-Sleep -Milliseconds 200
-            
-            # Try multiple key combinations
-            $keySequences = @(
-                "{ENTER}",
-                "^{ENTER}",
-                "{TAB}{ENTER}",
-                "{TAB}{TAB}{ENTER}",
-                " {BACKSPACE}{ENTER}"
-            )
-            
-            foreach ($sequence in $keySequences) {
-                try {
-                    [System.Windows.Forms.SendKeys]::SendWait($sequence)
-                    Start-Sleep -Milliseconds 300
-                    Write-Host "Sent: $sequence"
-                } catch {
-                    Write-Host "Failed to send: $sequence"
-                }
-            }
-            
-            Write-Host "WINDOWS_AUTOMATION_COMPLETE"
+            Write-Host "SIMPLE_ENTER_SUCCESS"
             return $true
             '''
             
-            result = subprocess.run(
-                ["powershell", "-ExecutionPolicy", "Bypass", "-Command", powershell_script],
-                capture_output=True,
-                text=True,
-                timeout=20
-            )
+            result = subprocess.run([
+                "powershell", "-ExecutionPolicy", "Bypass", "-Command", powershell_script
+            ], capture_output=True, text=True, timeout=3)
             
-            success = result.returncode == 0 and "WINDOWS_AUTOMATION_COMPLETE" in result.stdout
+            return result.returncode == 0 and "SIMPLE_ENTER_SUCCESS" in result.stdout
             
-            if success:
-                logger.info("✅ Windows enhanced auto-send successful")
-                # Log specific success details
-                if "Clicked at" in result.stdout:
-                    logger.debug("Mouse automation executed successfully")
-                if "Sent:" in result.stdout:
-                    logger.debug("Keyboard automation executed successfully")
-            else:
-                logger.warning(f"⚠️ Windows enhanced auto-send failed")
-                if "NO_WHATSAPP_WINDOWS" in result.stdout:
-                    logger.info("💡 No WhatsApp Chrome windows found")
-                elif "WINDOW_ACTIVATION_FAILED" in result.stdout:
-                    logger.info("💡 Failed to activate Chrome window")
-                elif result.stderr:
-                    logger.debug(f"PowerShell error: {result.stderr}")
-            
-            return success
-            
-        except subprocess.TimeoutExpired:
-            logger.error("Windows enhanced auto-send timed out")
-            return False
         except Exception as e:
-            logger.error(f"Windows enhanced auto-send failed: {e}")
+            logger.debug(f"Simple Enter failed: {e}")
             return False
     
     def _auto_send_windows_simple(self) -> bool:
@@ -1585,26 +1605,48 @@ class WhatsAppWebService:
                     # Try each detected Chrome path
                     for chrome_path in chrome_info["paths"]:
                         try:
-                            # Enhanced Chrome launching with better arguments
-                            chrome_args = [
-                                chrome_path,
-                                url,
-                                "--new-window",  # Open in new window for better automation
-                                "--disable-web-security",  # Help with automation
-                                "--disable-features=VizDisplayCompositor",  # Improve compatibility
-                                "--no-first-run",  # Skip first run setup
-                                "--no-default-browser-check"  # Skip default browser check
-                            ]
+                            # Enhanced Chrome launching optimized for WhatsApp Web automation
+                            if self.auto_send:
+                                # Auto-send mode: launch with automation-friendly flags
+                                chrome_args = [
+                                    chrome_path,
+                                    url,
+                                    "--new-window",  # Open in new window
+                                    "--start-maximized",  # Maximize for better element detection
+                                    "--disable-web-security",  # Help with automation
+                                    "--disable-features=VizDisplayCompositor",  # Improve compatibility
+                                    "--no-first-run",  # Skip first run setup
+                                    "--no-default-browser-check",  # Skip default browser check
+                                    "--disable-background-timer-throttling",  # Keep page active
+                                    "--disable-renderer-backgrounding",  # Prevent backgrounding
+                                    "--disable-backgrounding-occluded-windows"  # Keep window active
+                                ]
+                                logger.info("🚀 Launching Chrome with automation optimizations...")
+                            else:
+                                # Manual mode: standard launch
+                                chrome_args = [
+                                    chrome_path,
+                                    url,
+                                    "--new-window",
+                                    "--no-first-run",
+                                    "--no-default-browser-check"
+                                ]
                             
                             result = subprocess.run(
                                 chrome_args,
                                 capture_output=True,
                                 text=True,
-                                timeout=8
+                                timeout=10
                             )
                             
                             if result.returncode == 0:
                                 logger.info(f"✅ Opened WhatsApp Web in Chrome (Windows) - {chrome_path}")
+                                
+                                # For auto-send mode, wait a bit longer and verify page is ready
+                                if self.auto_send:
+                                    logger.info("⏱️ Giving Chrome extra time to initialize for automation...")
+                                    time.sleep(2)  # Extra time for Chrome to fully load
+                                
                                 return True
                             else:
                                 logger.debug(f"Chrome launch failed with args: {result.stderr}")
@@ -1939,6 +1981,112 @@ class WhatsAppWebService:
                 "registry_found": False,
                 "process_running": False
             }
+
+    def _verify_whatsapp_web_ready(self) -> bool:
+        """Verify that WhatsApp Web is loaded and ready for automation."""
+        try:
+            system = platform.system().lower()
+            
+            if system == "windows":
+                return self._verify_whatsapp_web_ready_windows()
+            elif system == "darwin":
+                return self._verify_whatsapp_web_ready_macos()
+            else:
+                # For Linux or other systems, assume ready
+                return True
+                
+        except Exception as e:
+            logger.debug(f"WhatsApp Web readiness check failed: {e}")
+            return False
+    
+    def _verify_whatsapp_web_ready_windows(self) -> bool:
+        """Verify WhatsApp Web is ready on Windows."""
+        try:
+            powershell_script = '''
+            try {
+                # Check if Chrome window with WhatsApp exists and is responsive
+                $chromeProcesses = Get-Process -Name "chrome" -ErrorAction SilentlyContinue | Where-Object { 
+                    $_.MainWindowTitle -like "*WhatsApp*" -and $_.MainWindowHandle -ne 0 
+                }
+                
+                if ($chromeProcesses) {
+                    # Try to check if page is loaded via DevTools (if available)
+                    try {
+                        $response = Invoke-RestMethod -Uri "http://localhost:9222/json" -TimeoutSec 2 -ErrorAction SilentlyContinue
+                        $whatsappTab = $response | Where-Object { $_.title -like "*WhatsApp*" -or $_.url -like "*web.whatsapp.com*" } | Select-Object -First 1
+                        
+                        if ($whatsappTab) {
+                            # Check if page is loaded
+                            $jsCode = "document.readyState === 'complete' && document.querySelector('[data-testid=\"conversation-compose-box-input\"], [contenteditable=\"true\"]') !== null ? 'READY' : 'NOT_READY'"
+                            $body = @{ expression = $jsCode } | ConvertTo-Json
+                            $result = Invoke-RestMethod -Uri "http://localhost:9222/json/runtime/evaluate" -Method Post -Body $body -ContentType "application/json" -TimeoutSec 2 -ErrorAction SilentlyContinue
+                            
+                            if ($result.result.value -eq "READY") {
+                                Write-Host "WHATSAPP_READY"
+                                return $true
+                            }
+                        }
+                    } catch {}
+                    
+                    # Fallback: assume ready if window exists
+                    Write-Host "WHATSAPP_WINDOW_EXISTS"
+                    return $true
+                } else {
+                    Write-Host "NO_WHATSAPP_WINDOW"
+                    return $false
+                }
+            } catch {
+                Write-Host "CHECK_FAILED"
+                return $false
+            }
+            '''
+            
+            result = subprocess.run([
+                "powershell", "-ExecutionPolicy", "Bypass", "-Command", powershell_script
+            ], capture_output=True, text=True, timeout=5)
+            
+            if "WHATSAPP_READY" in result.stdout:
+                return True
+            elif "WHATSAPP_WINDOW_EXISTS" in result.stdout:
+                logger.debug("WhatsApp window exists, assuming ready")
+                return True
+            else:
+                logger.debug("WhatsApp Web not ready or not found")
+                return False
+                
+        except Exception as e:
+            logger.debug(f"Windows WhatsApp Web readiness check failed: {e}")
+            return False
+    
+    def _verify_whatsapp_web_ready_macos(self) -> bool:
+        """Verify WhatsApp Web is ready on macOS."""
+        try:
+            applescript = '''
+            tell application "Google Chrome"
+                if (count of windows) > 0 then
+                    repeat with w from 1 to count of windows
+                        repeat with t from 1 to count of tabs of window w
+                            set tabTitle to title of tab t of window w
+                            set tabURL to URL of tab t of window w
+                            if tabTitle contains "WhatsApp" or tabURL contains "web.whatsapp.com" then
+                                return "WHATSAPP_TAB_FOUND"
+                            end if
+                        end repeat
+                    end repeat
+                end if
+                return "NO_WHATSAPP_TAB"
+            end tell
+            '''
+            
+            result = subprocess.run([
+                "osascript", "-e", applescript
+            ], capture_output=True, text=True, timeout=5)
+            
+            return result.returncode == 0 and "WHATSAPP_TAB_FOUND" in result.stdout
+            
+        except Exception as e:
+            logger.debug(f"macOS WhatsApp Web readiness check failed: {e}")
+            return False
 
     def _create_whatsapp_url(self, phone: str, message: str) -> str:
         """
