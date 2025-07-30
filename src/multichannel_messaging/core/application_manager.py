@@ -18,6 +18,7 @@ from PySide6.QtCore import QObject, QTimer, Signal
 from PySide6.QtWidgets import QApplication
 
 from .config_manager import ConfigManager
+from .message_logger import MessageLogger
 from ..utils.logger import get_logger, setup_logging
 from ..utils.platform_utils import get_logs_dir, get_platform, check_outlook_installed
 from ..utils.exceptions import MultiChannelMessagingError
@@ -187,6 +188,7 @@ class ApplicationManager:
         self.startup_time = time.time()
         self.config_manager: Optional[ConfigManager] = None
         self.health_monitor: Optional[ApplicationHealthMonitor] = None
+        self.message_logger: Optional[MessageLogger] = None
         self.qt_app: Optional[QApplication] = None
         self.main_window = None
         self.system_info: Optional[SystemInfo] = None
@@ -223,10 +225,13 @@ class ApplicationManager:
                 # Step 4: Setup logging
                 self._setup_enhanced_logging()
                 
-                # Step 5: Initialize health monitoring
+                # Step 5: Initialize message logging
+                self._initialize_message_logging()
+                
+                # Step 6: Initialize health monitoring
                 self._initialize_health_monitoring()
                 
-                # Step 6: Perform health checks
+                # Step 7: Perform health checks
                 self._perform_startup_health_checks()
                 
                 # Calculate startup duration
@@ -347,6 +352,29 @@ class ApplicationManager:
             logging.basicConfig(level=logging.INFO)
             logger.error(f"Failed to setup enhanced logging: {e}")
     
+    def _initialize_message_logging(self) -> None:
+        """Initialize message logging system."""
+        try:
+            # Get user ID from config or generate one
+            user_id = self.config_manager.get("user.id", "default_user")
+            
+            # Initialize message logger
+            logs_dir = get_logs_dir()
+            db_path = logs_dir / "message_logs.db"
+            
+            self.message_logger = MessageLogger(
+                db_path=str(db_path),
+                user_id=user_id
+            )
+            
+            # Register cleanup callback
+            self.register_cleanup_callback(self._cleanup_message_logger)
+            
+            logger.info("Message logging system initialized")
+            
+        except Exception as e:
+            logger.warning(f"Failed to initialize message logging: {e}")
+    
     def _initialize_health_monitoring(self) -> None:
         """Initialize health monitoring system."""
         try:
@@ -394,7 +422,10 @@ class ApplicationManager:
         try:
             from ..gui.main_window import MainWindow
             
-            self.main_window = MainWindow(self.config_manager)
+            self.main_window = MainWindow(
+                config_manager=self.config_manager,
+                message_logger=self.message_logger
+            )
             
             # Register cleanup callback
             self.register_cleanup_callback(self._cleanup_main_window)
@@ -484,6 +515,18 @@ class ApplicationManager:
             except Exception as e:
                 logger.warning(f"Failed to cleanup main window: {e}")
     
+    def _cleanup_message_logger(self) -> None:
+        """Cleanup message logger resources."""
+        if self.message_logger:
+            try:
+                # End any active session
+                if self.message_logger.current_session_id:
+                    self.message_logger.end_session()
+                
+                logger.debug("Message logger cleaned up")
+            except Exception as e:
+                logger.warning(f"Failed to cleanup message logger: {e}")
+    
     def get_system_info(self) -> Optional[SystemInfo]:
         """Get system information."""
         return self.system_info
@@ -499,6 +542,10 @@ class ApplicationManager:
         if self.health_monitor:
             return self.health_monitor.get_health_status()
         return None
+    
+    def get_message_logger(self) -> Optional[MessageLogger]:
+        """Get the message logger instance."""
+        return self.message_logger
 
 
 # Global application manager instance
