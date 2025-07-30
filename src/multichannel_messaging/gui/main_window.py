@@ -94,9 +94,10 @@ class EmailSendingThread(QThread):
 class MainWindow(QMainWindow):
     """Main application window."""
     
-    def __init__(self, config_manager: ConfigManager):
+    def __init__(self, config_manager: ConfigManager, message_logger=None):
         super().__init__()
         self.config_manager = config_manager
+        self.message_logger = message_logger
         self.csv_processor = CSVProcessor()
         self.email_service = None
         self.whatsapp_service = LocalWhatsAppBusinessService()  # WhatsApp Business API service
@@ -219,6 +220,14 @@ class MainWindow(QMainWindow):
         test_whatsapp_web_action = QAction(tr("test_whatsapp_web_service"), self)
         test_whatsapp_web_action.triggered.connect(self.test_whatsapp_web_connection)
         tools_menu.addAction(test_whatsapp_web_action)
+        
+        tools_menu.addSeparator()
+        
+        # Message Analytics
+        analytics_action = QAction("Message Analytics & Logs", self)
+        analytics_action.setShortcut("Ctrl+L")
+        analytics_action.triggered.connect(self.show_message_analytics)
+        tools_menu.addAction(analytics_action)
         
         # Help menu
         help_menu = menubar.addMenu(tr("menu_help"))
@@ -1117,6 +1126,26 @@ CSC-Reach streamlines business communication processes with professional email t
         dialog = LanguageSettingsDialog(self)
         dialog.language_changed.connect(self.on_language_changed)
         dialog.exec()
+    
+    def show_message_analytics(self):
+        """Show message analytics and logs dialog."""
+        if not self.message_logger:
+            QMessageBox.warning(
+                self, "Analytics Unavailable",
+                "Message logging is not available. Please restart the application."
+            )
+            return
+        
+        try:
+            from .message_analytics_dialog import MessageAnalyticsDialog
+            dialog = MessageAnalyticsDialog(self.message_logger, self)
+            dialog.exec()
+        except Exception as e:
+            logger.error(f"Failed to open analytics dialog: {e}")
+            QMessageBox.critical(
+                self, "Error",
+                f"Failed to open analytics dialog: {str(e)}"
+            )
     
     def on_language_changed(self, language_code: str):
         """Handle language change."""
