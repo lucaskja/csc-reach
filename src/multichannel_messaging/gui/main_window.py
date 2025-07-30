@@ -771,8 +771,11 @@ CSC-Reach Team""",
         self.recipients_list.clear()
         
         for customer in self.customers:
-            # Create display text with name, email, and phone
+            # Create display text with name, company, email, and phone
             display_parts = [customer.name]
+            
+            if customer.company:
+                display_parts.append(f"🏢 {customer.company}")
             
             if customer.email:
                 display_parts.append(f"📧 {customer.email}")
