@@ -224,7 +224,7 @@ class MainWindow(QMainWindow):
         tools_menu.addSeparator()
         
         # Message Analytics
-        analytics_action = QAction("Message Analytics & Logs", self)
+        analytics_action = QAction(tr("message_analytics_logs"), self)
         analytics_action.setShortcut("Ctrl+L")
         analytics_action.triggered.connect(self.show_message_analytics)
         tools_menu.addAction(analytics_action)

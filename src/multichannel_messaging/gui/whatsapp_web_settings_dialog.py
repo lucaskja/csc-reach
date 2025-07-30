@@ -35,7 +35,7 @@ class WhatsAppWebSettingsDialog(QDialog):
     
     def setup_ui(self):
         """Set up the user interface."""
-        self.setWindowTitle("WhatsApp Web Automation Settings")
+        self.setWindowTitle(tr("whatsapp_web_automation_settings"))
         self.setMinimumSize(550, 600)
         self.setModal(True)
         
@@ -72,7 +72,7 @@ class WhatsAppWebSettingsDialog(QDialog):
     
     def create_warning_section(self, layout):
         """Create the warning section."""
-        warning_group = QGroupBox("⚠️ IMPORTANT WARNINGS")
+        warning_group = QGroupBox(tr("important_warnings"))
         warning_group.setStyleSheet("""
             QGroupBox {
                 font-weight: bold;
@@ -130,30 +130,30 @@ class WhatsAppWebSettingsDialog(QDialog):
     
     def create_status_section(self, layout):
         """Create the service status section."""
-        status_group = QGroupBox("Service Status")
+        status_group = QGroupBox(tr("service_status"))
         status_layout = QGridLayout(status_group)
         
         # Service availability
-        self.service_status = QLabel("✅ Available (No external dependencies)")
+        self.service_status = QLabel(tr("service_available"))
         self.service_status.setStyleSheet("color: green;")
-        status_layout.addWidget(QLabel("Service:"), 0, 0)
+        status_layout.addWidget(QLabel(tr("service")), 0, 0)
         status_layout.addWidget(self.service_status, 0, 1)
         
         # Configuration status
         self.config_status = QLabel()
-        status_layout.addWidget(QLabel("Configuration:"), 1, 0)
+        status_layout.addWidget(QLabel(tr("configuration")), 1, 0)
         status_layout.addWidget(self.config_status, 1, 1)
         
         # Daily usage
         self.usage_status = QLabel()
-        status_layout.addWidget(QLabel("Daily Usage:"), 2, 0)
+        status_layout.addWidget(QLabel(tr("daily_usage")), 2, 0)
         status_layout.addWidget(self.usage_status, 2, 1)
         
         layout.addWidget(status_group)
     
     def create_how_it_works_section(self, layout):
         """Create the how it works section."""
-        how_group = QGroupBox("How It Works")
+        how_group = QGroupBox(tr("how_it_works"))
         how_layout = QVBoxLayout(how_group)
         
         steps = [
@@ -187,11 +187,11 @@ class WhatsAppWebSettingsDialog(QDialog):
     
     def create_configuration_section(self, layout):
         """Create the configuration section."""
-        config_group = QGroupBox("Configuration Settings")
+        config_group = QGroupBox(tr("configuration_settings"))
         config_layout = QGridLayout(config_group)
         
         # Auto-send option
-        self.auto_send_checkbox = QCheckBox("Enable automatic sending (HIGHER RISK)")
+        self.auto_send_checkbox = QCheckBox(tr("enable_auto_send"))
         self.auto_send_checkbox.setStyleSheet("QCheckBox { color: #d32f2f; font-weight: bold; }")
         config_layout.addWidget(self.auto_send_checkbox, 0, 0, 1, 2)
         
@@ -204,7 +204,7 @@ class WhatsAppWebSettingsDialog(QDialog):
         config_layout.addWidget(auto_send_help, 1, 0, 1, 2)
         
         # Close existing tabs option
-        self.close_tabs_checkbox = QCheckBox("Close existing WhatsApp Web tabs before opening new ones")
+        self.close_tabs_checkbox = QCheckBox(tr("close_existing_tabs"))
         self.close_tabs_checkbox.setChecked(True)  # Default to True
         self.close_tabs_checkbox.setToolTip("Prevents multiple WhatsApp Web tabs from opening simultaneously")
         config_layout.addWidget(self.close_tabs_checkbox, 2, 0, 1, 2)
@@ -263,7 +263,7 @@ class WhatsAppWebSettingsDialog(QDialog):
     
     def create_acknowledgment_section(self, layout):
         """Create the risk acknowledgment section."""
-        ack_group = QGroupBox("Risk Acknowledgment")
+        ack_group = QGroupBox(tr("risk_acknowledgment"))
         ack_group.setStyleSheet("""
             QGroupBox {
                 border: 2px solid #ff9800;
@@ -276,14 +276,14 @@ class WhatsAppWebSettingsDialog(QDialog):
         ack_layout = QVBoxLayout(ack_group)
         
         # Checkboxes for acknowledgment
-        self.ack_tos = QCheckBox("I understand this may violate WhatsApp's Terms of Service")
-        self.ack_ban = QCheckBox("I accept the risk of account suspension or ban")
-        self.ack_manual = QCheckBox("I understand I must manually send each message (unless auto-send is enabled)")
-        self.ack_alternative = QCheckBox("I acknowledge that WhatsApp Business API is the recommended alternative")
-        self.ack_responsibility = QCheckBox("I take full responsibility for any consequences")
+        self.ack_tos = QCheckBox(tr("ack_violate_tos"))
+        self.ack_ban = QCheckBox(tr("ack_accept_ban_risk"))
+        self.ack_manual = QCheckBox(tr("ack_manual_send"))
+        self.ack_alternative = QCheckBox(tr("ack_business_api_alternative"))
+        self.ack_responsibility = QCheckBox(tr("ack_full_responsibility"))
         
         # Auto-send specific acknowledgment
-        self.ack_auto_send = QCheckBox("I understand automatic sending significantly increases risks")
+        self.ack_auto_send = QCheckBox(tr("ack_auto_send_risks"))
         self.ack_auto_send.setStyleSheet("QCheckBox { color: #d32f2f; font-weight: bold; }")
         
         for checkbox in [self.ack_tos, self.ack_ban, self.ack_manual, 
@@ -303,7 +303,7 @@ class WhatsAppWebSettingsDialog(QDialog):
         separator.setFrameShadow(QFrame.Sunken)
         ack_layout.addWidget(separator)
         
-        self.final_ack = QCheckBox("I have read all warnings and choose to proceed at my own risk")
+        self.final_ack = QCheckBox(tr("final_acknowledgment"))
         self.final_ack.setStyleSheet("""
             QCheckBox { 
                 color: #d32f2f; 
@@ -320,24 +320,24 @@ class WhatsAppWebSettingsDialog(QDialog):
         button_layout = QHBoxLayout()
         
         # Test connection button
-        self.test_btn = QPushButton("Test Service")
+        self.test_btn = QPushButton(tr("test_service"))
         self.test_btn.clicked.connect(self.test_service)
         button_layout.addWidget(self.test_btn)
         
         # Reset usage button
-        self.reset_btn = QPushButton("Reset Daily Usage")
+        self.reset_btn = QPushButton(tr("reset_daily_usage"))
         self.reset_btn.clicked.connect(self.reset_usage)
         button_layout.addWidget(self.reset_btn)
         
         button_layout.addStretch()
         
         # Cancel button
-        cancel_btn = QPushButton("Cancel")
+        cancel_btn = QPushButton(tr("cancel"))
         cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(cancel_btn)
         
         # Save button
-        self.save_btn = QPushButton("Save Configuration")
+        self.save_btn = QPushButton(tr("save_configuration"))
         self.save_btn.clicked.connect(self.save_settings)
         self.save_btn.setEnabled(False)  # Disabled until all acknowledgments are checked
         button_layout.addWidget(self.save_btn)
@@ -375,10 +375,10 @@ class WhatsAppWebSettingsDialog(QDialog):
         """Update the status display."""
         # Configuration status
         if self.service.is_configured():
-            self.config_status.setText("✅ Configured")
+            self.config_status.setText(tr("configured"))
             self.config_status.setStyleSheet("color: green;")
         else:
-            self.config_status.setText("❌ Not configured")
+            self.config_status.setText(tr("not_configured_orange"))
             self.config_status.setStyleSheet("color: orange;")
         
         # Usage status

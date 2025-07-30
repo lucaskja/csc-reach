@@ -11,6 +11,7 @@ from PySide6.QtCore import Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QFont
 
 from ..services.whatsapp_local_service import LocalWhatsAppBusinessService
+from ..core.i18n_manager import tr
 from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -42,7 +43,7 @@ class WhatsAppSettingsDialog(QDialog):
         self.service = LocalWhatsAppBusinessService()
         self.connection_test_thread = None
         
-        self.setWindowTitle("WhatsApp Business API Settings")
+        self.setWindowTitle(tr("whatsapp_business_api_settings"))
         self.setModal(True)
         self.resize(600, 500)
         
@@ -54,7 +55,7 @@ class WhatsAppSettingsDialog(QDialog):
         layout = QVBoxLayout(self)
         
         # Title
-        title_label = QLabel("WhatsApp Business API Configuration")
+        title_label = QLabel(tr("whatsapp_business_api_configuration"))
         title_font = QFont()
         title_font.setPointSize(14)
         title_font.setBold(True)
@@ -63,60 +64,60 @@ class WhatsAppSettingsDialog(QDialog):
         layout.addWidget(title_label)
         
         # API Credentials Group
-        credentials_group = QGroupBox("API Credentials")
+        credentials_group = QGroupBox(tr("api_credentials"))
         credentials_layout = QFormLayout(credentials_group)
         
         self.access_token_edit = QLineEdit()
         self.access_token_edit.setEchoMode(QLineEdit.Password)
-        self.access_token_edit.setPlaceholderText("Enter your WhatsApp Business API access token")
-        credentials_layout.addRow("Access Token:", self.access_token_edit)
+        self.access_token_edit.setPlaceholderText(tr("access_token_placeholder"))
+        credentials_layout.addRow(tr("access_token_label"), self.access_token_edit)
         
         self.phone_number_id_edit = QLineEdit()
-        self.phone_number_id_edit.setPlaceholderText("Enter your phone number ID")
-        credentials_layout.addRow("Phone Number ID:", self.phone_number_id_edit)
+        self.phone_number_id_edit.setPlaceholderText(tr("phone_number_id_placeholder"))
+        credentials_layout.addRow(tr("phone_number_id_label"), self.phone_number_id_edit)
         
         self.business_account_id_edit = QLineEdit()
-        self.business_account_id_edit.setPlaceholderText("Enter your business account ID (optional)")
-        credentials_layout.addRow("Business Account ID:", self.business_account_id_edit)
+        self.business_account_id_edit.setPlaceholderText(tr("business_account_id_placeholder"))
+        credentials_layout.addRow(tr("business_account_id_label"), self.business_account_id_edit)
         
         # Show/Hide password checkbox
-        self.show_token_checkbox = QCheckBox("Show Access Token")
+        self.show_token_checkbox = QCheckBox(tr("show_access_token"))
         self.show_token_checkbox.toggled.connect(self.toggle_token_visibility)
         credentials_layout.addRow("", self.show_token_checkbox)
         
         layout.addWidget(credentials_group)
         
         # Rate Limiting Group
-        limits_group = QGroupBox("Rate Limiting & Quotas")
+        limits_group = QGroupBox(tr("rate_limiting_quotas"))
         limits_layout = QFormLayout(limits_group)
         
         self.rate_limit_spin = QSpinBox()
         self.rate_limit_spin.setRange(1, 100)
         self.rate_limit_spin.setValue(20)
-        self.rate_limit_spin.setSuffix(" messages/minute")
-        limits_layout.addRow("Rate Limit:", self.rate_limit_spin)
+        self.rate_limit_spin.setSuffix(tr("messages_per_minute"))
+        limits_layout.addRow(tr("rate_limit_label"), self.rate_limit_spin)
         
         self.daily_limit_spin = QSpinBox()
         self.daily_limit_spin.setRange(1, 10000)
         self.daily_limit_spin.setValue(1000)
-        self.daily_limit_spin.setSuffix(" messages/day")
-        limits_layout.addRow("Daily Limit:", self.daily_limit_spin)
+        self.daily_limit_spin.setSuffix(tr("messages_per_day"))
+        limits_layout.addRow(tr("daily_limit_label"), self.daily_limit_spin)
         
         self.delay_spin = QDoubleSpinBox()
         self.delay_spin.setRange(0.1, 60.0)
         self.delay_spin.setValue(3.0)
-        self.delay_spin.setSuffix(" seconds")
+        self.delay_spin.setSuffix(tr("seconds"))
         self.delay_spin.setDecimals(1)
-        limits_layout.addRow("Delay Between Messages:", self.delay_spin)
+        limits_layout.addRow(tr("delay_between_messages"), self.delay_spin)
         
         layout.addWidget(limits_group)
         
         # Connection Test Group
-        test_group = QGroupBox("Connection Test")
+        test_group = QGroupBox(tr("connection_test"))
         test_layout = QVBoxLayout(test_group)
         
         test_button_layout = QHBoxLayout()
-        self.test_button = QPushButton("Test Connection")
+        self.test_button = QPushButton(tr("test_connection"))
         self.test_button.clicked.connect(self.test_connection)
         test_button_layout.addWidget(self.test_button)
         
@@ -134,31 +135,25 @@ class WhatsAppSettingsDialog(QDialog):
         layout.addWidget(test_group)
         
         # Current Status Group
-        status_group = QGroupBox("Current Status")
+        status_group = QGroupBox(tr("current_status"))
         status_layout = QFormLayout(status_group)
         
-        self.status_label = QLabel("Not configured")
-        status_layout.addRow("Configuration Status:", self.status_label)
+        self.status_label = QLabel(tr("not_configured"))
+        status_layout.addRow(tr("configuration_status"), self.status_label)
         
-        self.usage_label = QLabel("N/A")
-        status_layout.addRow("Today's Usage:", self.usage_label)
+        self.usage_label = QLabel(tr("not_available"))
+        status_layout.addRow(tr("todays_usage"), self.usage_label)
         
         layout.addWidget(status_group)
         
         # Setup Instructions
-        instructions_group = QGroupBox("Setup Instructions")
+        instructions_group = QGroupBox(tr("setup_instructions"))
         instructions_layout = QVBoxLayout(instructions_group)
         
         instructions_text = QTextEdit()
         instructions_text.setReadOnly(True)
         instructions_text.setMaximumHeight(120)
-        instructions_text.setPlainText(
-            "1. Create a Meta Business Account at business.facebook.com\n"
-            "2. Apply for WhatsApp Business API access\n"
-            "3. Get your phone number verified and approved\n"
-            "4. Obtain your Access Token and Phone Number ID from the Meta Developer Console\n"
-            "5. Enter the credentials above and test the connection"
-        )
+        instructions_text.setPlainText(tr("whatsapp_setup_instructions"))
         instructions_layout.addWidget(instructions_text)
         
         layout.addWidget(instructions_group)
@@ -166,17 +161,17 @@ class WhatsAppSettingsDialog(QDialog):
         # Buttons
         button_layout = QHBoxLayout()
         
-        self.clear_button = QPushButton("Clear Credentials")
+        self.clear_button = QPushButton(tr("clear_credentials"))
         self.clear_button.clicked.connect(self.clear_credentials)
         button_layout.addWidget(self.clear_button)
         
         button_layout.addStretch()
         
-        self.cancel_button = QPushButton("Cancel")
+        self.cancel_button = QPushButton(tr("cancel"))
         self.cancel_button.clicked.connect(self.reject)
         button_layout.addWidget(self.cancel_button)
         
-        self.save_button = QPushButton("Save Settings")
+        self.save_button = QPushButton(tr("save_settings"))
         self.save_button.clicked.connect(self.save_settings)
         self.save_button.setDefault(True)
         button_layout.addWidget(self.save_button)
@@ -213,10 +208,10 @@ class WhatsAppSettingsDialog(QDialog):
         """Update the status display."""
         try:
             if self.service.is_configured():
-                self.status_label.setText("✅ Configured and ready")
+                self.status_label.setText(tr("configured_ready"))
                 self.status_label.setStyleSheet("color: green;")
             else:
-                self.status_label.setText("❌ Not configured")
+                self.status_label.setText(tr("not_configured_status"))
                 self.status_label.setStyleSheet("color: red;")
             
             # Update usage stats
@@ -236,8 +231,8 @@ class WhatsAppSettingsDialog(QDialog):
         if not access_token or not phone_number_id:
             QMessageBox.warning(
                 self,
-                "Missing Information",
-                "Please enter both Access Token and Phone Number ID before testing."
+                tr("missing_information"),
+                tr("missing_token_phone_id")
             )
             return
         
@@ -246,8 +241,8 @@ class WhatsAppSettingsDialog(QDialog):
         if not temp_service.save_credentials(access_token, phone_number_id, self.business_account_id_edit.text().strip()):
             QMessageBox.critical(
                 self,
-                "Error",
-                "Failed to save credentials for testing."
+                tr("error"),
+                tr("error_save_credentials")
             )
             return
         
@@ -256,7 +251,7 @@ class WhatsAppSettingsDialog(QDialog):
         self.test_progress.setVisible(True)
         self.test_progress.setRange(0, 0)  # Indeterminate progress
         self.test_result_text.clear()
-        self.test_result_text.append("Testing connection...")
+        self.test_result_text.append(tr("testing_connection"))
         
         # Start test thread
         self.connection_test_thread = ConnectionTestThread(temp_service)
@@ -290,8 +285,8 @@ class WhatsAppSettingsDialog(QDialog):
             if not access_token or not phone_number_id:
                 QMessageBox.warning(
                     self,
-                    "Missing Information",
-                    "Please enter both Access Token and Phone Number ID."
+                    tr("missing_information"),
+                    tr("missing_token_phone_required")
                 )
                 return
             
@@ -300,8 +295,8 @@ class WhatsAppSettingsDialog(QDialog):
             if not self.service.save_credentials(access_token, phone_number_id, business_account_id):
                 QMessageBox.critical(
                     self,
-                    "Error",
-                    "Failed to save WhatsApp credentials."
+                    tr("error"),
+                    tr("error_save_whatsapp_credentials")
                 )
                 return
             
@@ -311,8 +306,8 @@ class WhatsAppSettingsDialog(QDialog):
             
             QMessageBox.information(
                 self,
-                "Settings Saved",
-                "WhatsApp Business API settings have been saved successfully."
+                tr("settings_saved"),
+                tr("whatsapp_settings_saved")
             )
             
             self.accept()
@@ -321,17 +316,16 @@ class WhatsAppSettingsDialog(QDialog):
             logger.error(f"Failed to save WhatsApp settings: {e}")
             QMessageBox.critical(
                 self,
-                "Error",
-                f"Failed to save settings: {e}"
+                tr("error"),
+                tr("error_save_settings", error=str(e))
             )
     
     def clear_credentials(self):
         """Clear stored WhatsApp credentials."""
         reply = QMessageBox.question(
             self,
-            "Clear Credentials",
-            "Are you sure you want to clear all WhatsApp credentials?\n"
-            "This will disable WhatsApp functionality until reconfigured.",
+            tr("clear_credentials"),
+            tr("clear_credentials_confirm"),
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No
         )
@@ -346,13 +340,15 @@ class WhatsAppSettingsDialog(QDialog):
                 
                 QMessageBox.information(
                     self,
-                    "Credentials Cleared",
-                    "WhatsApp credentials have been cleared successfully."
+                    tr("credentials_cleared"),
+                    tr("whatsapp_credentials_cleared")
                 )
             else:
                 QMessageBox.critical(
                     self,
-                    "Error",
+                    tr("error"),
+                    tr("error_clear_credentials")
+                )
                     "Failed to clear WhatsApp credentials."
                 )
     

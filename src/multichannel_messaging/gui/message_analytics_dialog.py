@@ -19,6 +19,7 @@ from PySide6.QtCharts import QChart, QChartView, QLineSeries, QPieSeries, QBarSe
 
 from ..core.message_logger import MessageLogger, MessageLogEntry, SessionSummary, AnalyticsReport
 from ..core.models import MessageStatus
+from ..core.i18n_manager import tr
 from ..utils.logger import get_logger
 
 
@@ -58,7 +59,7 @@ class MessageAnalyticsDialog(QDialog):
         self.message_logger = message_logger
         self.logger = get_logger(__name__)
         
-        self.setWindowTitle("Message Analytics & Logs")
+        self.setWindowTitle(tr("message_analytics_dialog_title"))
         self.setMinimumSize(1000, 700)
         self.resize(1200, 800)
         
