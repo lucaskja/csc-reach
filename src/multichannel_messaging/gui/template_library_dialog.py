@@ -9,6 +9,8 @@ Provides a comprehensive interface for:
 """
 
 from typing import Optional, List, Dict, Any
+from datetime import datetime
+from pathlib import Path
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QLineEdit, QPushButton, QTextEdit, QComboBox,
@@ -23,7 +25,7 @@ from PySide6.QtGui import QFont, QColor, QPalette, QAction, QIcon
 
 from ..core.template_manager import TemplateManager, TemplateCategory
 from ..core.models import MessageTemplate, Customer
-from ..core.i18n_manager import get_i18n_manager
+from ..core.i18n_manager import get_i18n_manager, tr
 from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -353,7 +355,7 @@ class TemplateEditDialog(QDialog):
             # Validate input
             name = self.name_edit.text().strip()
             if not name:
-                QMessageBox.warning(self, "Validation Error", "Template name is required.")
+                QMessageBox.warning(self, tr("validation_error"), tr("template_name_required"))
                 return
             
             channels = []
@@ -363,22 +365,22 @@ class TemplateEditDialog(QDialog):
                 channels.append("whatsapp")
             
             if not channels:
-                QMessageBox.warning(self, "Validation Error", "At least one channel must be selected.")
+                QMessageBox.warning(self, tr("validation_error"), tr("channel_required"))
                 return
             
             # Email validation
             if "email" in channels:
                 if not self.subject_edit.text().strip():
-                    QMessageBox.warning(self, "Validation Error", "Email subject is required.")
+                    QMessageBox.warning(self, tr("validation_error"), tr("email_subject_required"))
                     return
                 if not self.content_edit.toPlainText().strip():
-                    QMessageBox.warning(self, "Validation Error", "Email content is required.")
+                    QMessageBox.warning(self, tr("validation_error"), tr("email_content_required"))
                     return
             
             # WhatsApp validation
             if "whatsapp" in channels:
                 if not self.whatsapp_edit.toPlainText().strip():
-                    QMessageBox.warning(self, "Validation Error", "WhatsApp content is required.")
+                    QMessageBox.warning(self, tr("validation_error"), tr("whatsapp_content_required"))
                     return
             
             # Create or update template
@@ -411,14 +413,14 @@ class TemplateEditDialog(QDialog):
             
             # Save template
             if self.template_manager.save_template(template, category_id, description):
-                QMessageBox.information(self, "Success", f"Template '{name}' saved successfully.")
+                QMessageBox.information(self, tr("success"), tr("template_saved_success", name=name))
                 self.accept()
             else:
-                QMessageBox.critical(self, "Error", "Failed to save template.")
+                QMessageBox.critical(self, tr("error"), tr("template_save_failed"))
                 
         except Exception as e:
             logger.error(f"Template save error: {e}")
-            QMessageBox.critical(self, "Error", f"Failed to save template: {str(e)}")
+            QMessageBox.critical(self, tr("error"), tr("template_save_failed") + f": {str(e)}")
 
 
 class TemplateLibraryDialog(QDialog):
@@ -693,71 +695,71 @@ class TemplateLibraryDialog(QDialog):
         if ok and new_name.strip():
             duplicate = self.template_manager.duplicate_template(template.id, new_name.strip())
             if duplicate:
-                QMessageBox.information(self, "Success", f"Template duplicated as '{new_name}'")
+                QMessageBox.information(self, tr("success"), tr("template_duplicated_success", name=new_name))
                 self.refresh_templates()
             else:
-                QMessageBox.critical(self, "Error", "Failed to duplicate template")
+                QMessageBox.critical(self, tr("error"), tr("template_duplicate_failed"))
     
     def delete_template(self, template: MessageTemplate):
         """Delete a template."""
         reply = QMessageBox.question(
-            self, "Delete Template",
-            f"Are you sure you want to delete template '{template.name}'?\n\nThis action cannot be undone.",
+            self, tr("delete_template"),
+            tr("confirm_delete_template", name=template.name),
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No
         )
         
         if reply == QMessageBox.Yes:
             if self.template_manager.delete_template(template.id):
-                QMessageBox.information(self, "Success", "Template deleted successfully")
+                QMessageBox.information(self, tr("success"), tr("template_deleted_success"))
                 self.refresh_templates()
             else:
-                QMessageBox.critical(self, "Error", "Failed to delete template")
+                QMessageBox.critical(self, tr("error"), tr("template_delete_failed"))
     
     def export_template(self, template: MessageTemplate):
         """Export a single template."""
         filename, _ = QFileDialog.getSaveFileName(
-            self, "Export Template",
+            self, tr("export_template"),
             f"{template.name.replace(' ', '_')}_template.json",
-            "JSON Files (*.json)"
+            tr("json_files")
         )
         
         if filename:
             export_path = self.template_manager.export_template(template.id, Path(filename))
             if export_path:
-                QMessageBox.information(self, "Success", f"Template exported to {filename}")
+                QMessageBox.information(self, tr("success"), tr("template_exported_success", path=filename))
             else:
-                QMessageBox.critical(self, "Error", "Failed to export template")
+                QMessageBox.critical(self, tr("error"), tr("template_export_failed"))
     
     def import_template(self):
         """Import a template from file."""
         filename, _ = QFileDialog.getOpenFileName(
-            self, "Import Template",
-            "", "JSON Files (*.json)"
+            self, tr("import_template"),
+            "", tr("json_files")
         )
         
         if filename:
             template = self.template_manager.import_template(Path(filename))
             if template:
-                QMessageBox.information(self, "Success", f"Template '{template.name}' imported successfully")
+                QMessageBox.information(self, tr("success"), tr("template_imported_success", name=template.name))
                 self.refresh_templates()
             else:
-                QMessageBox.critical(self, "Error", "Failed to import template")
+                QMessageBox.critical(self, tr("error"), tr("template_import_failed"))
     
     def export_all_templates(self):
         """Export all templates."""
         filename, _ = QFileDialog.getSaveFileName(
-            self, "Export All Templates",
+            self, tr("export_all_templates"),
             f"all_templates_{datetime.now().strftime('%Y%m%d')}.json",
-            "JSON Files (*.json)"
+            tr("json_files")
         )
         
         if filename:
             export_path = self.template_manager.export_all_templates(Path(filename))
             if export_path:
-                QMessageBox.information(self, "Success", f"All templates exported to {filename}")
+                QMessageBox.information(self, tr("success"), tr("templates_exported_success", path=filename))
             else:
-                QMessageBox.critical(self, "Error", "Failed to export templates")
+                QMessageBox.critical(self, tr("error"), tr("templates_export_failed"))
     
     def use_template(self):
         """Use the selected template."""

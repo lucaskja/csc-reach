@@ -13,6 +13,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont, QPixmap, QIcon
 
 from ..services.whatsapp_web_service import WhatsAppWebService
+from ..core.i18n_manager import tr
 from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -429,17 +430,16 @@ class WhatsAppWebSettingsDialog(QDialog):
                     f"✅ {message}\n\nWhatsApp Web should have opened in your browser."
                 )
             else:
-                QMessageBox.warning(self, "Service Test", f"❌ {message}")
+                QMessageBox.warning(self, tr("whatsapp_web_service_test"), f"❌ {message}")
         except Exception as e:
-            QMessageBox.critical(self, "Service Test", f"Test failed: {e}")
+            QMessageBox.critical(self, tr("whatsapp_web_service_test"), tr("test_failed", error=str(e)))
     
     def reset_usage(self):
         """Reset daily usage."""
         reply = QMessageBox.question(
             self,
-            "Reset Daily Usage",
-            "Are you sure you want to reset today's message count?\n\n"
-            "This should only be used for testing purposes.",
+            tr("reset_daily_usage"),
+            tr("reset_usage_confirm"),
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No
         )
@@ -447,7 +447,7 @@ class WhatsAppWebSettingsDialog(QDialog):
         if reply == QMessageBox.Yes:
             self.service.reset_daily_usage()
             self.update_status_display()
-            QMessageBox.information(self, "Usage Reset", "Daily usage has been reset.")
+            QMessageBox.information(self, tr("usage_reset"), tr("usage_reset_success"))
     
     def save_settings(self):
         """Save the service settings."""

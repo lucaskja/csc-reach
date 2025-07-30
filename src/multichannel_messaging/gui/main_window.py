@@ -149,81 +149,81 @@ class MainWindow(QMainWindow):
         menubar = self.menuBar()
         
         # File menu
-        file_menu = menubar.addMenu("File")
+        file_menu = menubar.addMenu(tr("menu_file"))
         
-        import_action = QAction("Import CSV...", self)
+        import_action = QAction(tr("import_csv_menu"), self)
         import_action.setShortcut("Ctrl+O")
         import_action.triggered.connect(self.import_csv)
         file_menu.addAction(import_action)
         
         file_menu.addSeparator()
         
-        exit_action = QAction("Exit", self)
+        exit_action = QAction(tr("exit"), self)
         exit_action.setShortcut("Ctrl+Q")
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
         
         # Templates menu
-        templates_menu = menubar.addMenu(self.i18n_manager.tr("menu_templates"))
+        templates_menu = menubar.addMenu(tr("menu_templates"))
         
-        template_library_action = QAction(self.i18n_manager.tr("template_library_menu"), self)
+        template_library_action = QAction(tr("template_library_menu"), self)
         template_library_action.setShortcut("Ctrl+T")
         template_library_action.triggered.connect(self.open_template_library)
         templates_menu.addAction(template_library_action)
         
         templates_menu.addSeparator()
         
-        new_template_action = QAction(self.i18n_manager.tr("new_template_menu"), self)
+        new_template_action = QAction(tr("new_template_menu"), self)
         new_template_action.setShortcut("Ctrl+N")
         new_template_action.triggered.connect(self.create_new_template)
         templates_menu.addAction(new_template_action)
         
-        save_template_action = QAction(self.i18n_manager.tr("save_current_template"), self)
+        save_template_action = QAction(tr("save_current_template"), self)
         save_template_action.setShortcut("Ctrl+S")
         save_template_action.triggered.connect(self.save_current_template)
         templates_menu.addAction(save_template_action)
         
         templates_menu.addSeparator()
         
-        import_template_action = QAction(self.i18n_manager.tr("import_template_menu"), self)
+        import_template_action = QAction(tr("import_template_menu"), self)
         import_template_action.triggered.connect(self.import_template_file)
         templates_menu.addAction(import_template_action)
         
-        export_templates_action = QAction(self.i18n_manager.tr("export_all_templates_menu"), self)
+        export_templates_action = QAction(tr("export_all_templates_menu"), self)
         export_templates_action.triggered.connect(self.export_all_templates)
         templates_menu.addAction(export_templates_action)
         
         # Tools menu
-        tools_menu = menubar.addMenu("Tools")
+        tools_menu = menubar.addMenu(tr("menu_tools"))
         
-        test_outlook_action = QAction("Test Outlook Connection", self)
+        test_outlook_action = QAction(tr("test_outlook_connection"), self)
         test_outlook_action.triggered.connect(self.test_outlook_connection)
         tools_menu.addAction(test_outlook_action)
         
         tools_menu.addSeparator()
         
-        whatsapp_settings_action = QAction("WhatsApp Business API Settings...", self)
+        whatsapp_settings_action = QAction(tr("whatsapp_business_api_settings"), self)
         whatsapp_settings_action.triggered.connect(self.show_whatsapp_settings)
         tools_menu.addAction(whatsapp_settings_action)
         
-        whatsapp_web_settings_action = QAction("WhatsApp Web Settings...", self)
+        whatsapp_web_settings_action = QAction(tr("whatsapp_web_settings"), self)
         whatsapp_web_settings_action.triggered.connect(self.show_whatsapp_web_settings)
         tools_menu.addAction(whatsapp_web_settings_action)
         
         tools_menu.addSeparator()
         
-        test_whatsapp_action = QAction("Test WhatsApp Business API", self)
+        test_whatsapp_action = QAction(tr("test_whatsapp_business_api"), self)
         test_whatsapp_action.triggered.connect(self.test_whatsapp_connection)
         tools_menu.addAction(test_whatsapp_action)
         
-        test_whatsapp_web_action = QAction("Test WhatsApp Web Service", self)
+        test_whatsapp_web_action = QAction(tr("test_whatsapp_web_service"), self)
         test_whatsapp_web_action.triggered.connect(self.test_whatsapp_web_connection)
         tools_menu.addAction(test_whatsapp_web_action)
         
         # Help menu
-        help_menu = menubar.addMenu("Help")
+        help_menu = menubar.addMenu(tr("menu_help"))
         
-        about_action = QAction("About", self)
+        about_action = QAction(tr("about"), self)
         about_action.triggered.connect(self.show_about)
         help_menu.addAction(about_action)
     
@@ -267,7 +267,7 @@ class MainWindow(QMainWindow):
         self.draft_btn.setEnabled(False)
         toolbar_layout.addWidget(self.draft_btn)
         
-        self.stop_btn = QPushButton("Stop Sending")
+        self.stop_btn = QPushButton(tr("stop_sending"))
         self.stop_btn.clicked.connect(self.stop_sending)
         self.stop_btn.setEnabled(False)
         toolbar_layout.addWidget(self.stop_btn)
@@ -284,7 +284,7 @@ class MainWindow(QMainWindow):
         toolbar_layout.addWidget(QFrame())  # Separator
         
         # Status indicators
-        self.outlook_status_label = QLabel("Outlook: Not Connected")
+        self.outlook_status_label = QLabel(tr("outlook_not_connected"))
         toolbar_layout.addWidget(self.outlook_status_label)
         
         parent_layout.addLayout(toolbar_layout)
@@ -324,11 +324,11 @@ class MainWindow(QMainWindow):
         # Select all/none buttons
         buttons_layout = QHBoxLayout()
         
-        select_all_btn = QPushButton("Select All")
+        select_all_btn = QPushButton(tr("select_all"))
         select_all_btn.clicked.connect(self.select_all_recipients)
         buttons_layout.addWidget(select_all_btn)
         
-        select_none_btn = QPushButton("Select None")
+        select_none_btn = QPushButton(tr("select_none"))
         select_none_btn.clicked.connect(self.select_no_recipients)
         buttons_layout.addWidget(select_none_btn)
         
@@ -342,44 +342,44 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(panel)
         
         # Template section
-        template_group = QGroupBox("Message Template")
+        template_group = QGroupBox(tr("message_template"))
         template_layout = QVBoxLayout(template_group)
         
         # Template selector with management
         template_selector_layout = QHBoxLayout()
-        template_selector_layout.addWidget(QLabel(self.i18n_manager.tr("message_template") + ":"))
+        template_selector_layout.addWidget(QLabel(tr("message_template") + ":"))
         self.template_combo = QComboBox()
         self.template_combo.currentTextChanged.connect(self.on_template_changed)
         template_selector_layout.addWidget(self.template_combo)
         
         # Template management buttons
-        self.template_library_btn = QPushButton(self.i18n_manager.tr("library"))
-        self.template_library_btn.setToolTip(self.i18n_manager.tr("template_library"))
+        self.template_library_btn = QPushButton(tr("library"))
+        self.template_library_btn.setToolTip(tr("template_library"))
         self.template_library_btn.clicked.connect(self.open_template_library)
         template_selector_layout.addWidget(self.template_library_btn)
         
-        self.save_template_btn = QPushButton(self.i18n_manager.tr("save"))
-        self.save_template_btn.setToolTip(self.i18n_manager.tr("save_current_template"))
+        self.save_template_btn = QPushButton(tr("save"))
+        self.save_template_btn.setToolTip(tr("save_current_template"))
         self.save_template_btn.clicked.connect(self.save_current_template)
         template_selector_layout.addWidget(self.save_template_btn)
         
         # Add preview button
-        self.preview_btn = QPushButton(self.i18n_manager.tr("preview_message"))
+        self.preview_btn = QPushButton(tr("preview_message"))
         self.preview_btn.clicked.connect(self.preview_message)
         template_selector_layout.addWidget(self.preview_btn)
         
         template_layout.addLayout(template_selector_layout)
         
         # Email fields
-        email_group = QGroupBox("Email Content")
+        email_group = QGroupBox(tr("email_content_group"))
         email_layout = QVBoxLayout(email_group)
         
-        email_layout.addWidget(QLabel("Subject:"))
+        email_layout.addWidget(QLabel(tr("subject")))
         self.subject_edit = QTextEdit()
         self.subject_edit.setMaximumHeight(60)
         email_layout.addWidget(self.subject_edit)
         
-        email_layout.addWidget(QLabel("Email Content:"))
+        email_layout.addWidget(QLabel(tr("email_content")))
         self.content_edit = QTextEdit()
         self.content_edit.setMaximumHeight(200)
         email_layout.addWidget(self.content_edit)
@@ -387,17 +387,17 @@ class MainWindow(QMainWindow):
         template_layout.addWidget(email_group)
         
         # WhatsApp fields
-        whatsapp_group = QGroupBox("WhatsApp Content")
+        whatsapp_group = QGroupBox(tr("whatsapp_content_group"))
         whatsapp_layout = QVBoxLayout(whatsapp_group)
         
-        whatsapp_layout.addWidget(QLabel("WhatsApp Message:"))
+        whatsapp_layout.addWidget(QLabel(tr("whatsapp_message_label")))
         self.whatsapp_content_edit = QTextEdit()
         self.whatsapp_content_edit.setMaximumHeight(150)
-        self.whatsapp_content_edit.setPlaceholderText("Enter WhatsApp message content (leave empty to use email content)")
+        self.whatsapp_content_edit.setPlaceholderText(tr("whatsapp_placeholder"))
         whatsapp_layout.addWidget(self.whatsapp_content_edit)
         
         # Character count for WhatsApp
-        self.whatsapp_char_label = QLabel("Characters: 0/4096")
+        self.whatsapp_char_label = QLabel(tr("characters_count", count=0))
         self.whatsapp_char_label.setStyleSheet("color: gray;")
         self.whatsapp_content_edit.textChanged.connect(self.update_whatsapp_char_count)
         whatsapp_layout.addWidget(self.whatsapp_char_label)
@@ -407,13 +407,13 @@ class MainWindow(QMainWindow):
         layout.addWidget(template_group)
         
         # Progress section
-        progress_group = QGroupBox("Sending Progress")
+        progress_group = QGroupBox(tr("sending_progress"))
         progress_layout = QVBoxLayout(progress_group)
         
         self.progress_bar = QProgressBar()
         progress_layout.addWidget(self.progress_bar)
         
-        self.progress_label = QLabel("Ready to send")
+        self.progress_label = QLabel(tr("ready_to_send"))
         progress_layout.addWidget(self.progress_label)
         
         # Log area
@@ -432,16 +432,16 @@ class MainWindow(QMainWindow):
         self.setStatusBar(self.status_bar)
         
         # Add permanent widgets to status bar
-        self.email_status_label = QLabel("Email: Ready")
+        self.email_status_label = QLabel(tr("email_ready_status"))
         self.status_bar.addPermanentWidget(self.email_status_label)
         
-        self.whatsapp_status_label = QLabel("WhatsApp Business: Not configured")
+        self.whatsapp_status_label = QLabel(tr("whatsapp_business_not_configured_status"))
         self.status_bar.addPermanentWidget(self.whatsapp_status_label)
         
-        self.whatsapp_web_status_label = QLabel("WhatsApp Web: Not configured")
+        self.whatsapp_web_status_label = QLabel(tr("whatsapp_web_not_configured_status"))
         self.status_bar.addPermanentWidget(self.whatsapp_web_status_label)
         
-        self.quota_label = QLabel("Quota: 0/100")
+        self.quota_label = QLabel(tr("quota_status", current=0, total=100))
         self.status_bar.addPermanentWidget(self.quota_label)
     
     def set_window_icon(self):
@@ -481,8 +481,8 @@ class MainWindow(QMainWindow):
             logger.error(f"Failed to initialize email service: {e}")
             QMessageBox.warning(
                 self, 
-                "Outlook Connection Error", 
-                f"Failed to connect to Outlook:\n{e}\n\nPlease ensure Microsoft Outlook is installed and try again."
+                tr("outlook_connection_error"), 
+                tr("outlook_connection_failed", error=str(e))
             )
         
         # Update status display
@@ -569,7 +569,7 @@ CSC-Reach Team""",
         
         templates = self.template_manager.get_templates()
         if not templates:
-            self.template_combo.addItem(self.i18n_manager.tr("no_templates_available"), None)
+            self.template_combo.addItem(tr("no_templates_available"), None)
             return
         
         # Group templates by category
@@ -581,17 +581,17 @@ CSC-Reach Team""",
             
             # Translate category name
             if category_id == "welcome":
-                category_name = self.i18n_manager.tr("category_welcome")
+                category_name = tr("category_welcome")
             elif category_id == "follow_up":
-                category_name = self.i18n_manager.tr("category_follow_up")
+                category_name = tr("category_follow_up")
             elif category_id == "promotional":
-                category_name = self.i18n_manager.tr("category_promotional")
+                category_name = tr("category_promotional")
             elif category_id == "support":
-                category_name = self.i18n_manager.tr("category_support")
+                category_name = tr("category_support")
             elif category_id == "general":
-                category_name = self.i18n_manager.tr("category_general")
+                category_name = tr("category_general")
             else:
-                category_name = category.name if category else self.i18n_manager.tr("category_general")
+                category_name = category.name if category else tr("category_general")
             
             if category_name not in categories:
                 categories[category_name] = []
@@ -651,8 +651,8 @@ CSC-Reach Team""",
     def save_current_template(self):
         """Save the current template with modifications."""
         if not self.current_template:
-            QMessageBox.information(self, self.i18n_manager.tr("no_template_loaded"), 
-                                  self.i18n_manager.tr("no_template_loaded"))
+            QMessageBox.information(self, tr("no_template_loaded"), 
+                                  tr("no_template_loaded"))
             return
         
         # Update template with current UI content
@@ -666,11 +666,11 @@ CSC-Reach Team""",
             description=metadata.get("description", ""),
             tags=metadata.get("tags", [])
         ):
-            QMessageBox.information(self, self.i18n_manager.tr("template_saved_success").split("'")[0], 
-                                  self.i18n_manager.tr("template_saved_success", name=self.current_template.name))
+            QMessageBox.information(self, tr("success"), 
+                                  tr("template_saved_success", name=self.current_template.name))
         else:
-            QMessageBox.critical(self, self.i18n_manager.tr("template_save_failed"), 
-                               self.i18n_manager.tr("template_save_failed"))
+            QMessageBox.critical(self, tr("error"), 
+                               tr("template_save_failed"))
     
     def create_new_template(self):
         """Create a new template."""
@@ -682,43 +682,43 @@ CSC-Reach Team""",
     def import_template_file(self):
         """Import a template from file."""
         filename, _ = QFileDialog.getOpenFileName(
-            self, "Import Template",
-            "", "JSON Files (*.json)"
+            self, tr("import_template"),
+            "", tr("json_files")
         )
         
         if filename:
             template = self.template_manager.import_template(Path(filename))
             if template:
-                QMessageBox.information(self, "Success", f"Template '{template.name}' imported successfully.")
+                QMessageBox.information(self, tr("success"), tr("template_imported_successfully", name=template.name))
                 self.refresh_template_combo()
             else:
-                QMessageBox.critical(self, "Error", "Failed to import template.")
+                QMessageBox.critical(self, tr("error"), tr("failed_to_import_template"))
     
     def export_all_templates(self):
         """Export all templates to file."""
         from datetime import datetime
         filename, _ = QFileDialog.getSaveFileName(
-            self, "Export All Templates",
+            self, tr("export_all_templates"),
             f"all_templates_{datetime.now().strftime('%Y%m%d')}.json",
-            "JSON Files (*.json)"
+            tr("json_files")
         )
         
         if filename:
             from pathlib import Path
             export_path = self.template_manager.export_all_templates(Path(filename))
             if export_path:
-                QMessageBox.information(self, "Success", f"All templates exported to {filename}")
+                QMessageBox.information(self, tr("success"), tr("all_templates_exported", filename=filename))
             else:
-                QMessageBox.critical(self, "Error", "Failed to export templates.")
+                QMessageBox.critical(self, tr("error"), tr("failed_to_export_templates"))
     
     def import_csv(self):
         """Import CSV file with customer data."""
         try:
             file_path, _ = QFileDialog.getOpenFileName(
                 self,
-                "Import CSV File",
+                tr("import_csv_file"),
                 "",
-                "CSV Files (*.csv);;Text Files (*.txt);;All Files (*)"
+                f"{tr('csv_files')};;{tr('text_files')};;{tr('all_files')}"
             )
             
             if not file_path:
@@ -731,8 +731,8 @@ CSC-Reach Team""",
             if not validation['valid']:
                 QMessageBox.critical(
                     self,
-                    "Invalid CSV File",
-                    f"The selected file is not valid:\n\n" + "\n".join(validation['errors'])
+                    tr("invalid_csv_file"),
+                    tr("csv_file_not_valid") + "\n\n" + "\n".join(validation['errors'])
                 )
                 return
             
@@ -740,16 +740,16 @@ CSC-Reach Team""",
             customers, errors = self.csv_processor.load_customers(file_path)
             
             if errors:
-                error_msg = f"Found {len(errors)} errors while processing CSV:\n\n"
+                error_msg = tr("csv_errors_found", count=len(errors)) + "\n\n"
                 for error in errors[:5]:  # Show first 5 errors
-                    error_msg += f"Row {error['row_number']}: {error['error']}\n"
+                    error_msg += tr("csv_row_error", row=error['row_number'], error=error['error']) + "\n"
                 if len(errors) > 5:
-                    error_msg += f"... and {len(errors) - 5} more errors"
+                    error_msg += tr("csv_more_errors", count=len(errors) - 5)
                 
-                QMessageBox.warning(self, "CSV Processing Errors", error_msg)
+                QMessageBox.warning(self, tr("csv_processing_errors"), error_msg)
             
             if not customers:
-                QMessageBox.information(self, "No Valid Data", "No valid customer records found in the CSV file.")
+                QMessageBox.information(self, tr("no_valid_data"), tr("no_valid_records"))
                 return
             
             # Update UI with loaded customers
@@ -757,14 +757,14 @@ CSC-Reach Team""",
             self.update_recipients_list()
             self.update_send_button_state()
             
-            self.status_bar.showMessage(f"Loaded {len(customers)} customers from CSV", 3000)
-            self.log_message(f"Imported {len(customers)} customers from {file_path.name}")
+            self.status_bar.showMessage(tr("loaded_customers", count=len(customers)), 3000)
+            self.log_message(tr("imported_customers", count=len(customers), filename=file_path.name))
             
         except CSVProcessingError as e:
-            QMessageBox.critical(self, "CSV Processing Error", str(e))
+            QMessageBox.critical(self, tr("csv_processing_error"), str(e))
         except Exception as e:
             logger.error(f"Failed to import CSV: {e}")
-            QMessageBox.critical(self, "Import Error", f"Failed to import CSV file:\n{e}")
+            QMessageBox.critical(self, tr("import_error"), tr("failed_to_import_csv", error=str(e)))
     
     def update_recipients_list(self):
         """Update the recipients list widget."""
@@ -827,12 +827,12 @@ CSC-Reach Team""",
     def create_draft(self):
         """Create a draft email for the first selected customer."""
         if not self.email_service:
-            QMessageBox.warning(self, "Service Error", "Email service is not available.")
+            QMessageBox.warning(self, tr("service_error"), tr("email_service_not_available"))
             return
         
         selected_customers = self.get_selected_customers()
         if not selected_customers:
-            QMessageBox.information(self, "No Recipients", "Please select at least one recipient.")
+            QMessageBox.information(self, tr("no_recipients"), tr("please_select_recipients"))
             return
         
         # Use first selected customer for draft
@@ -847,14 +847,14 @@ CSC-Reach Team""",
             if success:
                 QMessageBox.information(
                     self, 
-                    "Draft Created", 
+                    tr("create_draft"), 
                     f"Draft email created for {customer.name} ({customer.email})\n\nCheck your Outlook drafts folder."
                 )
-                self.log_message(f"Draft email created for {customer.email}")
+                self.log_message(tr("draft_created", email=customer.email))
             else:
-                QMessageBox.warning(self, "Draft Failed", "Failed to create draft email.")
+                QMessageBox.warning(self, tr("draft_failed"), tr("failed_to_create_draft"))
         except Exception as e:
-            QMessageBox.critical(self, "Draft Error", f"Failed to create draft email:\n{e}")
+            QMessageBox.critical(self, tr("draft_error"), tr("failed_to_create_draft_error", error=str(e)))
     
     def update_send_button_state(self):
         """Update the send button enabled state."""
@@ -904,9 +904,9 @@ CSC-Reach Team""",
         self.log_message(f"Sending finished: {message}")
         
         if success:
-            QMessageBox.information(self, "Sending Complete", message)
+            QMessageBox.information(self, tr("sending_complete"), message)
         else:
-            QMessageBox.warning(self, "Sending Error", message)
+            QMessageBox.warning(self, tr("sending_error"), message)
         
         self.update_send_button_state()
     
@@ -985,22 +985,22 @@ CSC-Reach Team""",
     def test_outlook_connection(self):
         """Test Outlook connection."""
         if not self.email_service:
-            QMessageBox.warning(self, "Service Error", "Email service is not initialized.")
+            QMessageBox.warning(self, tr("service_error"), tr("email_service_not_initialized"))
             return
         
         try:
             success, message = self.email_service.test_connection()
             if success:
                 platform_info = self.email_service.get_platform_info()
-                QMessageBox.information(self, "Connection Test", f"Success: {message}\nPlatform: {platform_info}")
-                self.outlook_status_label.setText(f"Outlook: Connected ({platform_info})")
+                QMessageBox.information(self, tr("connection_test"), tr("connection_success", message=message, platform=platform_info))
+                self.outlook_status_label.setText(tr("outlook_connected", platform=platform_info))
                 self.outlook_status_label.setStyleSheet("color: green;")
             else:
-                QMessageBox.warning(self, "Connection Test", f"Failed: {message}")
-                self.outlook_status_label.setText("Outlook: Error")
+                QMessageBox.warning(self, tr("connection_test"), tr("connection_failed", message=message))
+                self.outlook_status_label.setText(tr("outlook_error"))
                 self.outlook_status_label.setStyleSheet("color: red;")
         except Exception as e:
-            QMessageBox.critical(self, "Connection Test", f"Test failed: {e}")
+            QMessageBox.critical(self, tr("connection_test"), tr("connection_test_failed", error=str(e)))
     
     def show_about(self):
         """Show about dialog."""
@@ -1023,7 +1023,7 @@ CSC-Reach streamlines business communication processes with professional email t
         """Update WhatsApp character count display."""
         content = self.whatsapp_content_edit.toPlainText()
         char_count = len(content)
-        self.whatsapp_char_label.setText(f"Characters: {char_count}/4096")
+        self.whatsapp_char_label.setText(tr("characters_count", count=char_count))
         
         if char_count > 4096:
             self.whatsapp_char_label.setStyleSheet("color: red;")
@@ -1147,46 +1147,118 @@ CSC-Reach streamlines business communication processes with professional email t
                 if lang_code and lang_code != self.i18n_manager.get_current_language():
                     success = self.i18n_manager.set_language(lang_code)
                     if success:
+                        # Update UI immediately
+                        self.refresh_ui_translations()
                         QMessageBox.information(
                             self,
-                            "Language Changed",
-                            f"Language changed to {display_name}.\n\n"
-                            "Please restart the application for all changes to take effect."
+                            tr("language_changed_restart").split(".")[0],
+                            tr("language_changed_restart")
                         )
-                        # Update window title immediately
-                        self.setWindowTitle(tr("app_title"))
                 break
+    
+    def refresh_ui_translations(self):
+        """Refresh all UI text with current language translations."""
+        # Update window title
+        self.setWindowTitle(tr("app_title"))
+        
+        # Update menu bar
+        menubar = self.menuBar()
+        menus = menubar.findChildren(QMenuBar)
+        
+        # Update toolbar buttons
+        self.import_btn.setText(tr("import_csv"))
+        self.send_btn.setText(tr("send_messages"))
+        self.draft_btn.setText(tr("create_draft"))
+        self.stop_btn.setText(tr("stop_sending"))
+        
+        # Update group boxes
+        for group_box in self.findChildren(QGroupBox):
+            if group_box.title() == "Recipients" or "Recipients" in group_box.title():
+                group_box.setTitle(tr("recipients"))
+            elif group_box.title() == "Message Template" or "Template" in group_box.title():
+                group_box.setTitle(tr("message_template"))
+            elif group_box.title() == "Email Content" or "Email" in group_box.title():
+                group_box.setTitle(tr("email_content_group"))
+            elif group_box.title() == "WhatsApp Content" or "WhatsApp" in group_box.title():
+                group_box.setTitle(tr("whatsapp_content_group"))
+            elif group_box.title() == "Sending Progress" or "Progress" in group_box.title():
+                group_box.setTitle(tr("sending_progress"))
+        
+        # Update buttons
+        for button in self.findChildren(QPushButton):
+            if button.text() == "Select All":
+                button.setText(tr("select_all"))
+            elif button.text() == "Select None":
+                button.setText(tr("select_none"))
+            elif button.text() == "Library" or button == self.template_library_btn:
+                button.setText(tr("library"))
+            elif button.text() == "Save" or button == self.save_template_btn:
+                button.setText(tr("save"))
+            elif button.text() == "Preview Message" or button == self.preview_btn:
+                button.setText(tr("preview_message"))
+        
+        # Update labels
+        self.recipients_info_label.setText(tr("no_recipients_loaded") if not self.customers else f"{len(self.customers)} {tr('recipients_loaded')}")
+        self.progress_label.setText(tr("ready_to_send"))
+        self.outlook_status_label.setText(tr("outlook_not_connected"))
+        
+        # Update status bar
+        self.email_status_label.setText(tr("email_ready_status"))
+        self.whatsapp_status_label.setText(tr("whatsapp_business_not_configured_status"))
+        self.whatsapp_web_status_label.setText(tr("whatsapp_web_not_configured_status"))
+        self.quota_label.setText(tr("quota_status", current=0, total=100))
+        
+        # Update WhatsApp character count
+        self.update_whatsapp_char_count()
+        
+        # Update template combo
+        self.refresh_template_combo()
+        
+        # Update channel combo
+        self.channel_combo.clear()
+        channel_options = [
+            (tr("email_only"), "email_only"),
+            (tr("whatsapp_business_api"), "whatsapp_business"),
+            (tr("whatsapp_web"), "whatsapp_web"),
+            (tr("email_whatsapp_business"), "email_whatsapp_business"),
+            (tr("email_whatsapp_web"), "email_whatsapp_web")
+        ]
+        
+        for display_text, channel_id in channel_options:
+            self.channel_combo.addItem(display_text, channel_id)
+        
+        self.channel_combo.setCurrentIndex(0)  # Reset to email only
     
     def test_whatsapp_connection(self):
         """Test WhatsApp Business API connection."""
         if not self.whatsapp_service.is_configured():
             QMessageBox.warning(
                 self, 
-                "WhatsApp Business API Not Configured", 
-                "Please configure WhatsApp Business API settings first.\n\nGo to Tools → WhatsApp Business API Settings to set up your credentials."
+                tr("whatsapp_business_not_configured"), 
+                tr("whatsapp_business_configure_first")
             )
             return
         
         try:
             success, message = self.whatsapp_service.test_connection()
             if success:
-                QMessageBox.information(self, "WhatsApp Business API Test", f"✅ {message}")
-                self.whatsapp_status_label.setText("WhatsApp Business: Connected")
+                QMessageBox.information(self, tr("whatsapp_business_test"), f"✅ {message}")
+                self.whatsapp_status_label.setText(tr("whatsapp_business_connected"))
                 self.whatsapp_status_label.setStyleSheet("color: green;")
             else:
-                QMessageBox.warning(self, "WhatsApp Business API Test", f"❌ {message}")
-                self.whatsapp_status_label.setText("WhatsApp Business: Connection failed")
+                QMessageBox.warning(self, tr("whatsapp_business_test"), f"❌ {message}")
+                self.whatsapp_status_label.setText(tr("whatsapp_business_connection_failed"))
                 self.whatsapp_status_label.setStyleSheet("color: red;")
         except Exception as e:
-            QMessageBox.critical(self, "WhatsApp Business API Test", f"Test failed: {e}")
+            QMessageBox.critical(self, tr("whatsapp_business_test"), tr("test_failed", error=str(e)))
     
     def test_whatsapp_web_connection(self):
         """Test WhatsApp Web service."""
         if not self.whatsapp_web_service.is_configured():
             QMessageBox.warning(
                 self, 
-                "WhatsApp Web Not Configured", 
-                "Please configure WhatsApp Web settings first.\n\nGo to Tools → WhatsApp Web Settings to acknowledge risks and configure the service."
+                tr("whatsapp_web_not_configured"), 
+                tr("whatsapp_web_configure_first")
             )
             return
         
@@ -1195,14 +1267,14 @@ CSC-Reach streamlines business communication processes with professional email t
             if success:
                 QMessageBox.information(
                     self, 
-                    "WhatsApp Web Service Test", 
-                    f"✅ {message}\n\nWhatsApp Web should have opened in your browser."
+                    tr("whatsapp_web_service_test"), 
+                    tr("whatsapp_web_opened_browser", message=message)
                 )
                 self.update_status_display()
             else:
-                QMessageBox.warning(self, "WhatsApp Web Service Test", f"❌ {message}")
+                QMessageBox.warning(self, tr("whatsapp_web_service_test"), f"❌ {message}")
         except Exception as e:
-            QMessageBox.critical(self, "WhatsApp Web Service Test", f"Test failed: {e}")
+            QMessageBox.critical(self, tr("whatsapp_web_service_test"), tr("test_failed", error=str(e)))
     
     def preview_message(self):
         """Preview message for selected channel(s)."""

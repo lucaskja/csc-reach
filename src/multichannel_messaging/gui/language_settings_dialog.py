@@ -62,13 +62,13 @@ class LanguageSettingsDialog(QDialog):
     
     def create_info_section(self, layout):
         """Create the information section."""
-        info_group = QGroupBox("Information")
+        info_group = QGroupBox(tr("dialog.information"))
         info_layout = QVBoxLayout(info_group)
         
         info_text = QLabel(
-            "• Language changes will take effect after restarting the application\n"
-            "• All interface text will be translated to the selected language\n"
-            "• Default message templates will be updated accordingly"
+            f"• {tr('language_restart_info')}\n"
+            f"• {tr('language_interface_info')}\n"
+            f"• {tr('language_templates_info')}"
         )
         info_text.setWordWrap(True)
         info_text.setStyleSheet("color: #666; font-style: italic;")
@@ -136,23 +136,22 @@ class LanguageSettingsDialog(QDialog):
                 lang_info = self.i18n_manager.get_supported_languages()[selected_lang]
                 QMessageBox.information(
                     self,
-                    "Language Changed",
-                    f"Language has been changed to {lang_info['native']}.\n\n"
-                    "Please restart the application for the changes to take effect."
+                    tr("language_changed"),
+                    tr("language_changed_message", language=lang_info['native'])
                 )
                 
                 self.accept()
             else:
                 QMessageBox.critical(
                     self,
-                    "Error",
-                    "Failed to change language. Please try again."
+                    tr("error"),
+                    tr("language_change_failed")
                 )
                 
         except Exception as e:
             logger.error(f"Failed to save language: {e}")
             QMessageBox.critical(
                 self,
-                "Error",
-                f"An error occurred while changing language:\n\n{e}"
+                tr("error"),
+                tr("language_change_error", error=str(e))
             )
