@@ -13,9 +13,24 @@ from PySide6.QtWidgets import (
     QProgressBar, QSpinBox, QCheckBox, QMessageBox, QFileDialog, QSplitter,
     QFrame, QScrollArea, QWidget
 )
-from PySide6.QtCore import Qt, QDate, QTimer, Signal, QThread, pyqtSignal
+from PySide6.QtCore import Qt, QDate, QTimer, Signal, QThread
+
+# Handle pyqtSignal import - it might be named differently on some systems
+try:
+    from PySide6.QtCore import pyqtSignal
+except ImportError:
+    # Fallback to Signal if pyqtSignal is not available
+    pyqtSignal = Signal
 from PySide6.QtGui import QFont, QPixmap, QPainter, QColor
-from PySide6.QtCharts import QChart, QChartView, QLineSeries, QPieSeries, QBarSeries, QBarSet
+
+# Try to import QCharts - it's optional and might not be available on all systems
+try:
+    from PySide6.QtCharts import QChart, QChartView, QLineSeries, QPieSeries, QBarSeries, QBarSet
+    CHARTS_AVAILABLE = True
+except ImportError:
+    # Fallback for systems without QCharts
+    CHARTS_AVAILABLE = False
+    QChart = QChartView = QLineSeries = QPieSeries = QBarSeries = QBarSet = None
 
 from ..core.message_logger import MessageLogger, MessageLogEntry, SessionSummary, AnalyticsReport
 from ..core.models import MessageStatus
@@ -362,8 +377,15 @@ class MessageAnalyticsDialog(QDialog):
         
         layout.addLayout(footer_layout)
     
-    def create_success_rate_chart(self) -> QChartView:
+    def create_success_rate_chart(self):
         """Create success rate chart."""
+        if not CHARTS_AVAILABLE:
+            # Fallback to a simple label when charts are not available
+            fallback_widget = QLabel("Charts not available - install PySide6-Addons for chart support")
+            fallback_widget.setAlignment(Qt.AlignCenter)
+            fallback_widget.setStyleSheet("border: 1px solid gray; padding: 20px; background-color: #f0f0f0;")
+            return fallback_widget
+            
         chart = QChart()
         chart.setTitle("Success Rate Over Time")
         
@@ -377,8 +399,15 @@ class MessageAnalyticsDialog(QDialog):
         chart_view = QChartView(chart)
         return chart_view
     
-    def create_channel_usage_chart(self) -> QChartView:
+    def create_channel_usage_chart(self):
         """Create channel usage pie chart."""
+        if not CHARTS_AVAILABLE:
+            # Fallback to a simple label when charts are not available
+            fallback_widget = QLabel("Charts not available - install PySide6-Addons for chart support")
+            fallback_widget.setAlignment(Qt.AlignCenter)
+            fallback_widget.setStyleSheet("border: 1px solid gray; padding: 20px; background-color: #f0f0f0;")
+            return fallback_widget
+            
         chart = QChart()
         chart.setTitle("Channel Usage")
         

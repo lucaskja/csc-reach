@@ -133,86 +133,110 @@ class MessageLogger:
         self.user_id = user_id
         self.logger = logging.getLogger(__name__)
         
-        # Set up database
+        # Set up database with Windows-safe path handling
         if db_path is None:
-            logs_dir = Path("logs")
-            logs_dir.mkdir(exist_ok=True)
-            db_path = logs_dir / "message_logs.db"
+            try:
+                # Use platform-appropriate logs directory
+                from ..utils.platform_utils import get_logs_dir
+                logs_dir = get_logs_dir()
+                logs_dir.mkdir(parents=True, exist_ok=True)
+                db_path = logs_dir / "message_logs.db"
+            except Exception as e:
+                # Fallback to current directory if logs dir creation fails
+                self.logger.warning(f"Failed to create logs directory, using fallback: {e}")
+                db_path = Path("message_logs.db")
         
         self.db_path = Path(db_path)
-        self._init_database()
+        
+        # Initialize database with error handling
+        try:
+            self._init_database()
+            self.logger.info(f"Message logger database initialized at: {self.db_path}")
+        except Exception as e:
+            self.logger.error(f"Failed to initialize message logger database: {e}")
+            # Create a no-op logger that doesn't crash the app
+            self._database_available = False
+            self.logger.warning("Message logging will be disabled due to database initialization failure")
+        else:
+            self._database_available = True
         
         # Current session tracking
         self.current_session_id: Optional[str] = None
         self.session_start_time: Optional[datetime] = None
+    
+    def _is_database_available(self) -> bool:
+        """Check if database is available for operations."""
+        return getattr(self, '_database_available', True)
         
     def _init_database(self) -> None:
         """Initialize the SQLite database with required tables."""
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS message_logs (
-                    id TEXT PRIMARY KEY,
-                    timestamp TEXT NOT NULL,
-                    user_id TEXT NOT NULL,
-                    session_id TEXT NOT NULL,
-                    channel TEXT NOT NULL,
-                    template_id TEXT NOT NULL,
-                    template_name TEXT NOT NULL,
-                    recipient_email TEXT NOT NULL,
-                    recipient_name TEXT NOT NULL,
-                    recipient_phone TEXT,
-                    recipient_company TEXT,
-                    message_status TEXT NOT NULL,
-                    message_id TEXT,
-                    delivery_status TEXT,
-                    error_message TEXT,
-                    sent_at TEXT,
-                    delivered_at TEXT,
-                    read_at TEXT,
-                    response_received INTEGER DEFAULT 0,
-                    content_preview TEXT,
-                    metadata TEXT
-                )
-            """)
+        try:
+            # Ensure parent directory exists
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
             
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS session_summaries (
-                    session_id TEXT PRIMARY KEY,
-                    user_id TEXT NOT NULL,
-                    start_time TEXT NOT NULL,
-                    end_time TEXT,
-                    channel TEXT NOT NULL,
-                    template_used TEXT NOT NULL,
-                    total_messages INTEGER NOT NULL,
-                    successful_messages INTEGER DEFAULT 0,
-                    failed_messages INTEGER DEFAULT 0,
-                    pending_messages INTEGER DEFAULT 0,
-                    cancelled_messages INTEGER DEFAULT 0,
-                    success_rate REAL DEFAULT 0.0,
-                    average_send_time REAL DEFAULT 0.0,
-                    errors TEXT,
-                    metadata TEXT
-                )
-            """)
-            
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS analytics_cache (
-                    report_id TEXT PRIMARY KEY,
-                    user_id TEXT NOT NULL,
-                    generated_at TEXT NOT NULL,
-                    date_range_start TEXT NOT NULL,
-                    date_range_end TEXT NOT NULL,
-                    report_data TEXT NOT NULL
-                )
-            """)
-            
-            # Create indexes for better performance
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_message_logs_user_timestamp ON message_logs(user_id, timestamp)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_message_logs_session ON message_logs(session_id)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_message_logs_status ON message_logs(message_status)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_session_summaries_user ON session_summaries(user_id)")
-            
-            conn.commit()
+            # Test database connection first
+            with sqlite3.connect(str(self.db_path)) as conn:
+                # Enable foreign keys and WAL mode for better performance
+                conn.execute("PRAGMA foreign_keys = ON")
+                conn.execute("PRAGMA journal_mode = WAL")
+                
+                # Create message logs table
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS message_logs (
+                        id TEXT PRIMARY KEY,
+                        timestamp TEXT NOT NULL,
+                        user_id TEXT NOT NULL,
+                        session_id TEXT NOT NULL,
+                        channel TEXT NOT NULL,
+                        template_id TEXT NOT NULL,
+                        template_name TEXT NOT NULL,
+                        recipient_email TEXT NOT NULL,
+                        recipient_name TEXT NOT NULL,
+                        recipient_phone TEXT,
+                        recipient_company TEXT,
+                        message_status TEXT NOT NULL,
+                        message_id TEXT,
+                        delivery_status TEXT,
+                        error_message TEXT,
+                        sent_at TEXT,
+                        delivered_at TEXT,
+                        read_at TEXT,
+                        response_received INTEGER DEFAULT 0,
+                        content_preview TEXT,
+                        metadata TEXT
+                    )
+                """)
+                
+                # Create session summaries table
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS session_summaries (
+                        session_id TEXT PRIMARY KEY,
+                        user_id TEXT NOT NULL,
+                        start_time TEXT NOT NULL,
+                        end_time TEXT,
+                        total_messages INTEGER DEFAULT 0,
+                        successful_messages INTEGER DEFAULT 0,
+                        failed_messages INTEGER DEFAULT 0,
+                        channels_used TEXT,
+                        templates_used TEXT,
+                        session_metadata TEXT
+                    )
+                """)
+                
+                # Create indexes for better performance
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_message_logs_timestamp ON message_logs(timestamp)")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_message_logs_user_id ON message_logs(user_id)")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_message_logs_session_id ON message_logs(session_id)")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_session_summaries_user_id ON session_summaries(user_id)")
+                
+                conn.commit()
+                
+        except sqlite3.Error as e:
+            self.logger.error(f"SQLite error during database initialization: {e}")
+            raise
+        except Exception as e:
+            self.logger.error(f"Unexpected error during database initialization: {e}")
+            raise
     
     def start_session(self, channel: str, template: MessageTemplate) -> str:
         """
@@ -229,15 +253,23 @@ class MessageLogger:
         self.current_session_id = session_id
         self.session_start_time = datetime.now()
         
+        if not self._is_database_available():
+            self.logger.debug("Database not available, session tracking disabled")
+            return session_id
+        
         # Create session record
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute("""
-                INSERT INTO session_summaries 
-                (session_id, user_id, start_time, channel, template_used, total_messages, errors, metadata)
-                VALUES (?, ?, ?, ?, ?, 0, '[]', '{}')
-            """, (session_id, self.user_id, self.session_start_time.isoformat(), 
-                  channel, template.name))
-            conn.commit()
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                conn.execute("""
+                    INSERT INTO session_summaries 
+                    (session_id, user_id, start_time, channels_used, templates_used, total_messages, successful_messages, failed_messages, session_metadata)
+                    VALUES (?, ?, ?, ?, ?, 0, 0, 0, '{}')
+                """, (session_id, self.user_id, self.session_start_time.isoformat(), 
+                      channel, template.name))
+                conn.commit()
+        except Exception as e:
+            self.logger.error(f"Failed to create session record: {e}")
+            # Continue without database logging
         
         self.logger.info(f"Started messaging session {session_id} for channel {channel}")
         return session_id
@@ -253,6 +285,11 @@ class MessageLogger:
         Returns:
             Log entry ID
         """
+        if not self._is_database_available():
+            # Return a dummy ID if database is not available
+            self.logger.debug("Database not available, skipping message logging")
+            return f"no_db_{datetime.now().strftime('%H%M%S_%f')}"
+            
         if not self.current_session_id:
             raise ValidationError("No active session. Call start_session() first.")
         
@@ -340,35 +377,73 @@ class MessageLogger:
             return None
         
         end_time = datetime.now()
-        session_summary = self._generate_session_summary(self.current_session_id, end_time)
         
-        # Update session record
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute("""
-                UPDATE session_summaries 
-                SET end_time = ?, total_messages = ?, successful_messages = ?,
-                    failed_messages = ?, pending_messages = ?, cancelled_messages = ?,
-                    success_rate = ?, average_send_time = ?, errors = ?
-                WHERE session_id = ?
-            """, (
-                end_time.isoformat(),
-                session_summary.total_messages,
-                session_summary.successful_messages,
-                session_summary.failed_messages,
-                session_summary.pending_messages,
-                session_summary.cancelled_messages,
-                session_summary.success_rate,
-                session_summary.average_send_time,
-                json.dumps(session_summary.errors),
-                self.current_session_id
-            ))
-            conn.commit()
+        if not self._is_database_available():
+            # Create a minimal session summary without database
+            self.logger.debug("Database not available, creating minimal session summary")
+            session_summary = SessionSummary(
+                session_id=self.current_session_id,
+                user_id=self.user_id,
+                start_time=self.session_start_time or datetime.now(),
+                end_time=end_time,
+                total_messages=0,
+                successful_messages=0,
+                failed_messages=0,
+                pending_messages=0,
+                cancelled_messages=0,
+                success_rate=0.0,
+                average_send_time=0.0,
+                channels_used=[],
+                templates_used=[],
+                errors=[]
+            )
+        else:
+            try:
+                session_summary = self._generate_session_summary(self.current_session_id, end_time)
+                
+                # Update session record
+                with sqlite3.connect(str(self.db_path)) as conn:
+                    conn.execute("""
+                        UPDATE session_summaries 
+                        SET end_time = ?, total_messages = ?, successful_messages = ?,
+                            failed_messages = ?
+                        WHERE session_id = ?
+                    """, (
+                        end_time.isoformat(),
+                        session_summary.total_messages,
+                        session_summary.successful_messages,
+                        session_summary.failed_messages,
+                        self.current_session_id
+                    ))
+                    conn.commit()
+            except Exception as e:
+                self.logger.error(f"Failed to end session: {e}")
+                # Create minimal summary as fallback
+                session_summary = SessionSummary(
+                    session_id=self.current_session_id,
+                    user_id=self.user_id,
+                    start_time=self.session_start_time or datetime.now(),
+                    end_time=end_time,
+                    total_messages=0,
+                    successful_messages=0,
+                    failed_messages=0,
+                    pending_messages=0,
+                    cancelled_messages=0,
+                    success_rate=0.0,
+                    average_send_time=0.0,
+                    channels_used=[],
+                    templates_used=[],
+                    errors=[]
+                )
         
         self.logger.info(f"Ended session {self.current_session_id}. "
-                        f"Sent {session_summary.successful_messages}/{session_summary.total_messages} messages")
+                        f"Total messages: {session_summary.total_messages}, "
+                        f"Successful: {session_summary.successful_messages}")
         
         self.current_session_id = None
         self.session_start_time = None
+        
+        return session_summary
         
         return session_summary
     

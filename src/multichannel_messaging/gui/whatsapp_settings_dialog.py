@@ -349,8 +349,6 @@ class WhatsAppSettingsDialog(QDialog):
                     tr("error"),
                     tr("error_clear_credentials")
                 )
-                    "Failed to clear WhatsApp credentials."
-                )
     
     def closeEvent(self, event):
         """Handle dialog close event."""
