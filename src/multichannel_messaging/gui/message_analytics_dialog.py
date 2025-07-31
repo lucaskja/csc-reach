@@ -34,7 +34,7 @@ except ImportError:
 
 from ..core.message_logger import MessageLogger, MessageLogEntry, SessionSummary, AnalyticsReport
 from ..core.models import MessageStatus
-from ..core.i18n_manager import tr
+from ..core.i18n_manager import get_i18n_manager
 from ..utils.logger import get_logger
 
 
@@ -73,8 +73,9 @@ class MessageAnalyticsDialog(QDialog):
         super().__init__(parent)
         self.message_logger = message_logger
         self.logger = get_logger(__name__)
+        self.i18n = get_i18n_manager()
         
-        self.setWindowTitle(tr("message_analytics_dialog_title"))
+        self.setWindowTitle(self.i18n.tr("message_analytics_dialog_title"))
         self.setMinimumSize(1000, 700)
         self.resize(1200, 800)
         
@@ -116,10 +117,10 @@ class MessageAnalyticsDialog(QDialog):
         # Quick stats
         self.stats_labels = {}
         stats = [
-            ("messages_30d", "Messages (30d)", "0"),
-            ("success_rate", "Success Rate", "0%"),
-            ("active_session", "Active Session", "No"),
-            ("most_used_channel", "Top Channel", "None")
+            ("messages_30d", self.i18n.tr("messages_30d"), "0"),
+            ("success_rate", self.i18n.tr("success_rate"), "0%"),
+            ("active_session", self.i18n.tr("active_session"), self.i18n.tr("no")),
+            ("most_used_channel", self.i18n.tr("most_used_channel"), self.i18n.tr("none"))
         ]
         
         for key, label, default in stats:
@@ -139,7 +140,7 @@ class MessageAnalyticsDialog(QDialog):
             self.stats_labels[key] = value_label
         
         # Refresh button
-        refresh_btn = QPushButton("Refresh")
+        refresh_btn = QPushButton(self.i18n.tr("refresh"))
         refresh_btn.clicked.connect(self.refresh_stats)
         header_layout.addWidget(refresh_btn)
         
@@ -164,19 +165,20 @@ class MessageAnalyticsDialog(QDialog):
         layout.addWidget(charts_splitter)
         
         # Recent activity
-        recent_group = QGroupBox("Recent Activity")
+        recent_group = QGroupBox(self.i18n.tr("recent_activity"))
         recent_layout = QVBoxLayout(recent_group)
         
         self.recent_activity_table = QTableWidget()
         self.recent_activity_table.setColumnCount(5)
         self.recent_activity_table.setHorizontalHeaderLabels([
-            "Time", "Channel", "Recipient", "Status", "Template"
+            self.i18n.tr("time"), self.i18n.tr("channel"), self.i18n.tr("recipient"), 
+            self.i18n.tr("status"), self.i18n.tr("template")
         ])
         recent_layout.addWidget(self.recent_activity_table)
         
         layout.addWidget(recent_group)
         
-        self.tab_widget.addTab(overview_widget, "Overview")
+        self.tab_widget.addTab(overview_widget, self.i18n.tr("overview"))
     
     def setup_message_logs_tab(self):
         """Set up the message logs tab."""
@@ -188,7 +190,7 @@ class MessageAnalyticsDialog(QDialog):
         filters_layout = QHBoxLayout(filters_frame)
         
         # Date range
-        filters_layout.addWidget(QLabel("Days:"))
+        filters_layout.addWidget(QLabel(self.i18n.tr("days") + ":"))
         self.days_spin = QSpinBox()
         self.days_spin.setRange(1, 365)
         self.days_spin.setValue(30)
@@ -196,23 +198,24 @@ class MessageAnalyticsDialog(QDialog):
         filters_layout.addWidget(self.days_spin)
         
         # Channel filter
-        filters_layout.addWidget(QLabel("Channel:"))
+        filters_layout.addWidget(QLabel(self.i18n.tr("channel") + ":"))
         self.channel_filter = QComboBox()
-        self.channel_filter.addItems(["All", "email", "whatsapp"])
+        self.channel_filter.addItems([self.i18n.tr("all"), self.i18n.tr("email"), self.i18n.tr("whatsapp")])
         self.channel_filter.currentTextChanged.connect(self.refresh_message_logs)
         filters_layout.addWidget(self.channel_filter)
         
         # Status filter
-        filters_layout.addWidget(QLabel("Status:"))
+        filters_layout.addWidget(QLabel(self.i18n.tr("status") + ":"))
         self.status_filter = QComboBox()
-        self.status_filter.addItems(["All", "sent", "failed", "pending", "cancelled"])
+        self.status_filter.addItems([self.i18n.tr("all"), self.i18n.tr("sent"), self.i18n.tr("failed"), 
+                                   self.i18n.tr("pending"), self.i18n.tr("cancelled")])
         self.status_filter.currentTextChanged.connect(self.refresh_message_logs)
         filters_layout.addWidget(self.status_filter)
         
         filters_layout.addStretch()
         
         # Export button
-        export_btn = QPushButton("Export Logs")
+        export_btn = QPushButton(self.i18n.tr("export_logs"))
         export_btn.clicked.connect(self.export_message_logs)
         filters_layout.addWidget(export_btn)
         
@@ -222,13 +225,14 @@ class MessageAnalyticsDialog(QDialog):
         self.message_logs_table = QTableWidget()
         self.message_logs_table.setColumnCount(8)
         self.message_logs_table.setHorizontalHeaderLabels([
-            "Timestamp", "Channel", "Template", "Recipient", "Company", 
-            "Status", "Error", "Message ID"
+            self.i18n.tr("timestamp"), self.i18n.tr("channel"), self.i18n.tr("template"), 
+            self.i18n.tr("recipient"), self.i18n.tr("company"), 
+            self.i18n.tr("status"), self.i18n.tr("error"), self.i18n.tr("message_id")
         ])
         self.message_logs_table.setSortingEnabled(True)
         layout.addWidget(self.message_logs_table)
         
-        self.tab_widget.addTab(logs_widget, "Message Logs")
+        self.tab_widget.addTab(logs_widget, self.i18n.tr("message_logs"))
     
     def setup_session_history_tab(self):
         """Set up the session history tab."""
@@ -239,15 +243,17 @@ class MessageAnalyticsDialog(QDialog):
         self.sessions_table = QTableWidget()
         self.sessions_table.setColumnCount(9)
         self.sessions_table.setHorizontalHeaderLabels([
-            "Session ID", "Start Time", "End Time", "Channel", "Template",
-            "Total", "Successful", "Failed", "Success Rate"
+            self.i18n.tr("session_id"), self.i18n.tr("start_time"), self.i18n.tr("end_time"), 
+            self.i18n.tr("channel"), self.i18n.tr("template"),
+            self.i18n.tr("total"), self.i18n.tr("successful"), self.i18n.tr("failed"), 
+            self.i18n.tr("success_rate")
         ])
         self.sessions_table.setSortingEnabled(True)
         self.sessions_table.itemSelectionChanged.connect(self.on_session_selected)
         layout.addWidget(self.sessions_table)
         
         # Session details
-        details_group = QGroupBox("Session Details")
+        details_group = QGroupBox(self.i18n.tr("session_details"))
         details_layout = QVBoxLayout(details_group)
         
         self.session_details_text = QTextEdit()
@@ -256,7 +262,7 @@ class MessageAnalyticsDialog(QDialog):
         
         layout.addWidget(details_group)
         
-        self.tab_widget.addTab(sessions_widget, "Session History")
+        self.tab_widget.addTab(sessions_widget, self.i18n.tr("session_history"))
     
     def setup_analytics_tab(self):
         """Set up the analytics tab."""
@@ -267,20 +273,20 @@ class MessageAnalyticsDialog(QDialog):
         controls_frame = QFrame()
         controls_layout = QHBoxLayout(controls_frame)
         
-        controls_layout.addWidget(QLabel("Analysis Period:"))
+        controls_layout.addWidget(QLabel(self.i18n.tr("analysis_period") + ":"))
         self.analytics_days = QSpinBox()
         self.analytics_days.setRange(7, 365)
         self.analytics_days.setValue(30)
         controls_layout.addWidget(self.analytics_days)
         
-        generate_btn = QPushButton("Generate Report")
+        generate_btn = QPushButton(self.i18n.tr("generate_report"))
         generate_btn.clicked.connect(self.generate_analytics_report)
         controls_layout.addWidget(generate_btn)
         
         controls_layout.addStretch()
         
         # Export analytics button
-        export_analytics_btn = QPushButton("Export Report")
+        export_analytics_btn = QPushButton(self.i18n.tr("export_report"))
         export_analytics_btn.clicked.connect(self.export_analytics_report)
         controls_layout.addWidget(export_analytics_btn)
         
@@ -292,7 +298,7 @@ class MessageAnalyticsDialog(QDialog):
         self.analytics_layout = QVBoxLayout(self.analytics_content)
         
         # Placeholder for analytics
-        placeholder_label = QLabel("Click 'Generate Report' to view analytics")
+        placeholder_label = QLabel(self.i18n.tr("click_generate_report"))
         placeholder_label.setAlignment(Qt.AlignCenter)
         self.analytics_layout.addWidget(placeholder_label)
         
@@ -300,7 +306,7 @@ class MessageAnalyticsDialog(QDialog):
         self.analytics_scroll.setWidgetResizable(True)
         layout.addWidget(self.analytics_scroll)
         
-        self.tab_widget.addTab(analytics_widget, "Analytics")
+        self.tab_widget.addTab(analytics_widget, self.i18n.tr("analytics"))
     
     def setup_data_management_tab(self):
         """Set up the data management tab."""
@@ -308,62 +314,62 @@ class MessageAnalyticsDialog(QDialog):
         layout = QVBoxLayout(management_widget)
         
         # Data export section
-        export_group = QGroupBox("Data Export")
+        export_group = QGroupBox(self.i18n.tr("data_export"))
         export_layout = QGridLayout(export_group)
         
-        export_layout.addWidget(QLabel("Export Format:"), 0, 0)
+        export_layout.addWidget(QLabel(self.i18n.tr("export_format") + ":"), 0, 0)
         self.export_format = QComboBox()
-        self.export_format.addItems(["JSON", "CSV"])
+        self.export_format.addItems([self.i18n.tr("json"), self.i18n.tr("csv")])
         export_layout.addWidget(self.export_format, 0, 1)
         
-        export_layout.addWidget(QLabel("Days to Export:"), 1, 0)
+        export_layout.addWidget(QLabel(self.i18n.tr("days") + ":"), 1, 0)
         self.export_days = QSpinBox()
         self.export_days.setRange(1, 365)
         self.export_days.setValue(30)
         export_layout.addWidget(self.export_days, 1, 1)
         
-        export_data_btn = QPushButton("Export All Data")
+        export_data_btn = QPushButton(self.i18n.tr("export_all_data"))
         export_data_btn.clicked.connect(self.export_all_data)
         export_layout.addWidget(export_data_btn, 2, 0, 1, 2)
         
         layout.addWidget(export_group)
         
         # Data cleanup section
-        cleanup_group = QGroupBox("Data Management")
+        cleanup_group = QGroupBox(self.i18n.tr("data_management"))
         cleanup_layout = QGridLayout(cleanup_group)
         
-        cleanup_layout.addWidget(QLabel("Delete data older than:"), 0, 0)
+        cleanup_layout.addWidget(QLabel(self.i18n.tr("delete_data_older_than") + ":"), 0, 0)
         self.cleanup_days = QSpinBox()
         self.cleanup_days.setRange(30, 365)
         self.cleanup_days.setValue(90)
         cleanup_layout.addWidget(self.cleanup_days, 0, 1)
-        cleanup_layout.addWidget(QLabel("days"), 0, 2)
+        cleanup_layout.addWidget(QLabel(self.i18n.tr("days")), 0, 2)
         
-        cleanup_btn = QPushButton("Delete Old Data")
+        cleanup_btn = QPushButton(self.i18n.tr("cleanup_data"))
         cleanup_btn.clicked.connect(self.cleanup_old_data)
         cleanup_layout.addWidget(cleanup_btn, 1, 0, 1, 3)
         
         layout.addWidget(cleanup_group)
         
         # Database info
-        info_group = QGroupBox("Database Information")
+        info_group = QGroupBox(self.i18n.tr("database_info"))
         info_layout = QVBoxLayout(info_group)
         
-        self.db_info_label = QLabel("Loading database information...")
+        self.db_info_label = QLabel(self.i18n.tr("loading_analytics"))
         info_layout.addWidget(self.db_info_label)
         
         layout.addWidget(info_group)
         
         layout.addStretch()
         
-        self.tab_widget.addTab(management_widget, "Data Management")
+        self.tab_widget.addTab(management_widget, self.i18n.tr("data_management"))
     
     def setup_footer(self, layout: QVBoxLayout):
         """Set up the footer with action buttons."""
         footer_layout = QHBoxLayout()
         
         # Auto-refresh checkbox
-        self.auto_refresh_cb = QCheckBox("Auto-refresh (30s)")
+        self.auto_refresh_cb = QCheckBox(self.i18n.tr("auto_refresh"))
         self.auto_refresh_cb.setChecked(True)
         self.auto_refresh_cb.toggled.connect(self.toggle_auto_refresh)
         footer_layout.addWidget(self.auto_refresh_cb)
@@ -371,7 +377,7 @@ class MessageAnalyticsDialog(QDialog):
         footer_layout.addStretch()
         
         # Close button
-        close_btn = QPushButton("Close")
+        close_btn = QPushButton(self.i18n.tr("close"))
         close_btn.clicked.connect(self.accept)
         footer_layout.addWidget(close_btn)
         
@@ -381,17 +387,17 @@ class MessageAnalyticsDialog(QDialog):
         """Create success rate chart."""
         if not CHARTS_AVAILABLE:
             # Fallback to a simple label when charts are not available
-            fallback_widget = QLabel("Charts not available - install PySide6-Addons for chart support")
+            fallback_widget = QLabel(self.i18n.tr("charts_not_available"))
             fallback_widget.setAlignment(Qt.AlignCenter)
             fallback_widget.setStyleSheet("border: 1px solid gray; padding: 20px; background-color: #f0f0f0;")
             return fallback_widget
             
         chart = QChart()
-        chart.setTitle("Success Rate Over Time")
+        chart.setTitle(self.i18n.tr("success_rate_over_time"))
         
         # This would be populated with actual data
         series = QLineSeries()
-        series.setName("Success Rate %")
+        series.setName(self.i18n.tr("success_rate_percent"))
         
         chart.addSeries(series)
         chart.createDefaultAxes()
@@ -403,17 +409,17 @@ class MessageAnalyticsDialog(QDialog):
         """Create channel usage pie chart."""
         if not CHARTS_AVAILABLE:
             # Fallback to a simple label when charts are not available
-            fallback_widget = QLabel("Charts not available - install PySide6-Addons for chart support")
+            fallback_widget = QLabel(self.i18n.tr("charts_not_available"))
             fallback_widget.setAlignment(Qt.AlignCenter)
             fallback_widget.setStyleSheet("border: 1px solid gray; padding: 20px; background-color: #f0f0f0;")
             return fallback_widget
             
         chart = QChart()
-        chart.setTitle("Channel Usage")
+        chart.setTitle(self.i18n.tr("channel_usage"))
         
         series = QPieSeries()
-        series.append("Email", 70)
-        series.append("WhatsApp", 30)
+        series.append(self.i18n.tr("email"), 70)
+        series.append(self.i18n.tr("whatsapp"), 30)
         
         chart.addSeries(series)
         
@@ -434,7 +440,7 @@ class MessageAnalyticsDialog(QDialog):
             
             self.stats_labels["messages_30d"].setText(str(stats["messages_last_30_days"]))
             self.stats_labels["success_rate"].setText(f"{stats['success_rate_30_days']}%")
-            self.stats_labels["active_session"].setText("Yes" if stats["current_session_active"] else "No")
+            self.stats_labels["active_session"].setText(self.i18n.tr("yes") if stats["current_session_active"] else self.i18n.tr("no"))
             self.stats_labels["most_used_channel"].setText(stats["most_used_channel"])
             
         except Exception as e:
@@ -448,8 +454,8 @@ class MessageAnalyticsDialog(QDialog):
             status = self.status_filter.currentText()
             
             # Get filtered logs
-            channel_filter = None if channel == "All" else channel
-            status_filter = None if status == "All" else MessageStatus(status)
+            channel_filter = None if channel == self.i18n.tr("all") else channel
+            status_filter = None if status == self.i18n.tr("all") else MessageStatus(status)
             
             logs = self.message_logger.get_message_history(
                 days=days, 
@@ -493,7 +499,7 @@ class MessageAnalyticsDialog(QDialog):
                     session.start_time.strftime("%Y-%m-%d %H:%M:%S")
                 ))
                 self.sessions_table.setItem(row, 2, QTableWidgetItem(
-                    session.end_time.strftime("%Y-%m-%d %H:%M:%S") if session.end_time else "Active"
+                    session.end_time.strftime("%Y-%m-%d %H:%M:%S") if session.end_time else self.i18n.tr("active")
                 ))
                 self.sessions_table.setItem(row, 3, QTableWidgetItem(session.channel))
                 self.sessions_table.setItem(row, 4, QTableWidgetItem(session.template_used))
@@ -536,7 +542,7 @@ class MessageAnalyticsDialog(QDialog):
         days = self.analytics_days.value()
         
         # Show loading indicator
-        self.analytics_layout.addWidget(QLabel("Generating analytics report..."))
+        self.analytics_layout.addWidget(QLabel(self.i18n.tr("generating_analytics")))
         
         # Start worker thread
         self.analytics_worker = AnalyticsWorker(self.message_logger, days)
@@ -551,11 +557,11 @@ class MessageAnalyticsDialog(QDialog):
             self.analytics_layout.itemAt(i).widget().setParent(None)
         
         # Display report sections
-        self.add_analytics_section("Overview", {
-            "Total Messages": report.total_messages_sent,
-            "Total Sessions": report.total_sessions,
-            "Overall Success Rate": f"{report.overall_success_rate:.1f}%",
-            "Avg Messages/Session": f"{report.average_messages_per_session:.1f}"
+        self.add_analytics_section(self.i18n.tr("overview_analytics"), {
+            self.i18n.tr("total_messages"): report.total_messages_sent,
+            self.i18n.tr("total_sessions"): report.total_sessions,
+            self.i18n.tr("overall_success_rate"): f"{report.overall_success_rate:.1f}%",
+            self.i18n.tr("avg_messages_per_session"): f"{report.average_messages_per_session:.1f}"
         })
         
         # Add more sections as needed...
@@ -577,7 +583,8 @@ class MessageAnalyticsDialog(QDialog):
     
     def handle_analytics_error(self, error_message: str):
         """Handle analytics generation error."""
-        QMessageBox.warning(self, "Analytics Error", f"Failed to generate analytics: {error_message}")
+        QMessageBox.warning(self, self.i18n.tr("analytics_error"), 
+                          self.i18n.tr("analytics_error_message", error=error_message))
     
     def export_message_logs(self):
         """Export message logs to file."""
@@ -587,8 +594,8 @@ class MessageAnalyticsDialog(QDialog):
             status = self.status_filter.currentText()
             
             # Get filtered logs
-            channel_filter = None if channel == "All" else channel
-            status_filter = None if status == "All" else MessageStatus(status)
+            channel_filter = None if channel == self.i18n.tr("all") else channel
+            status_filter = None if status == self.i18n.tr("all") else MessageStatus(status)
             
             logs = self.message_logger.get_message_history(
                 days=days, 
@@ -598,9 +605,9 @@ class MessageAnalyticsDialog(QDialog):
             
             # Save to file
             filename, _ = QFileDialog.getSaveFileName(
-                self, "Export Message Logs", 
+                self, self.i18n.tr("export_message_logs"), 
                 f"message_logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-                "JSON Files (*.json);;CSV Files (*.csv)"
+                self.i18n.tr("json_files")
             )
             
             if filename:
@@ -611,10 +618,12 @@ class MessageAnalyticsDialog(QDialog):
                     # CSV export logic would go here
                     pass
                 
-                QMessageBox.information(self, "Export Complete", f"Logs exported to {filename}")
+                QMessageBox.information(self, self.i18n.tr("export_complete"), 
+                                       self.i18n.tr("export_complete_message", filename=filename))
         
         except Exception as e:
-            QMessageBox.warning(self, "Export Error", f"Failed to export logs: {e}")
+            QMessageBox.warning(self, self.i18n.tr("export_error"), 
+                              self.i18n.tr("export_error_message", error=str(e)))
     
     def export_analytics_report(self):
         """Export analytics report to file."""
@@ -630,7 +639,7 @@ class MessageAnalyticsDialog(QDialog):
             data = self.message_logger.export_data(format_type, days)
             
             filename, _ = QFileDialog.getSaveFileName(
-                self, "Export All Data",
+                self, self.i18n.tr("export_all_data_title"),
                 f"messaging_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{format_type}",
                 f"{format_type.upper()} Files (*.{format_type})"
             )
@@ -639,19 +648,20 @@ class MessageAnalyticsDialog(QDialog):
                 with open(filename, 'w') as f:
                     f.write(data)
                 
-                QMessageBox.information(self, "Export Complete", f"Data exported to {filename}")
+                QMessageBox.information(self, self.i18n.tr("export_complete"), 
+                                      self.i18n.tr("data_exported_message", filename=filename))
         
         except Exception as e:
-            QMessageBox.warning(self, "Export Error", f"Failed to export data: {e}")
+            QMessageBox.warning(self, self.i18n.tr("export_error"), 
+                              self.i18n.tr("data_export_error", error=str(e)))
     
     def cleanup_old_data(self):
         """Delete old data from the database."""
         days = self.cleanup_days.value()
         
         reply = QMessageBox.question(
-            self, "Confirm Deletion",
-            f"Are you sure you want to delete all data older than {days} days?\n"
-            "This action cannot be undone.",
+            self, self.i18n.tr("confirm_deletion"),
+            self.i18n.tr("confirm_deletion_message", days=days),
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No
         )
@@ -660,14 +670,15 @@ class MessageAnalyticsDialog(QDialog):
             try:
                 deleted_count = self.message_logger.delete_old_data(days)
                 QMessageBox.information(
-                    self, "Cleanup Complete",
-                    f"Deleted {deleted_count} old records."
+                    self, self.i18n.tr("cleanup_complete"),
+                    self.i18n.tr("cleanup_complete_message", count=deleted_count)
                 )
                 self.refresh_current_tab()
                 self.update_db_info()
             
             except Exception as e:
-                QMessageBox.warning(self, "Cleanup Error", f"Failed to cleanup data: {e}")
+                QMessageBox.warning(self, self.i18n.tr("cleanup_error"), 
+                                  self.i18n.tr("cleanup_error_message", error=str(e)))
     
     def update_db_info(self):
         """Update database information display."""
@@ -689,10 +700,10 @@ Sessions (30d): {stats['sessions_last_30_days']}
                 
                 self.db_info_label.setText(info_text)
             else:
-                self.db_info_label.setText("Database not found")
+                self.db_info_label.setText(self.i18n.tr("database_not_found"))
         
         except Exception as e:
-            self.db_info_label.setText(f"Error loading database info: {e}")
+            self.db_info_label.setText(self.i18n.tr("database_info_error", error=str(e)))
     
     def toggle_auto_refresh(self, enabled: bool):
         """Toggle auto-refresh functionality."""
