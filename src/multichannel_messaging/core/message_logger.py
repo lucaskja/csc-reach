@@ -214,9 +214,14 @@ class MessageLogger:
                         user_id TEXT NOT NULL,
                         start_time TEXT NOT NULL,
                         end_time TEXT,
+                        channel TEXT,
+                        template_used TEXT,
                         total_messages INTEGER DEFAULT 0,
                         successful_messages INTEGER DEFAULT 0,
                         failed_messages INTEGER DEFAULT 0,
+                        pending_messages INTEGER DEFAULT 0,
+                        cancelled_messages INTEGER DEFAULT 0,
+                        success_rate REAL DEFAULT 0.0,
                         channels_used TEXT,
                         templates_used TEXT,
                         session_metadata TEXT
@@ -249,7 +254,10 @@ class MessageLogger:
         Returns:
             Session ID
         """
-        session_id = f"{self.user_id}_{channel}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        import uuid
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        unique_id = str(uuid.uuid4())[:8]
+        session_id = f"{self.user_id}_{channel}_{timestamp}_{unique_id}"
         self.current_session_id = session_id
         self.session_start_time = datetime.now()
         
@@ -262,10 +270,12 @@ class MessageLogger:
             with sqlite3.connect(str(self.db_path)) as conn:
                 conn.execute("""
                     INSERT INTO session_summaries 
-                    (session_id, user_id, start_time, channels_used, templates_used, total_messages, successful_messages, failed_messages, session_metadata)
-                    VALUES (?, ?, ?, ?, ?, 0, 0, 0, '{}')
+                    (session_id, user_id, start_time, channel, template_used, channels_used, templates_used, 
+                     total_messages, successful_messages, failed_messages, pending_messages, cancelled_messages, 
+                     success_rate, session_metadata)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0.0, '{}')
                 """, (session_id, self.user_id, self.session_start_time.isoformat(), 
-                      channel, template.name))
+                      channel, template.name, channel, template.name))
                 conn.commit()
         except Exception as e:
             self.logger.error(f"Failed to create session record: {e}")
@@ -406,13 +416,17 @@ class MessageLogger:
                     conn.execute("""
                         UPDATE session_summaries 
                         SET end_time = ?, total_messages = ?, successful_messages = ?,
-                            failed_messages = ?
+                            failed_messages = ?, pending_messages = ?, cancelled_messages = ?,
+                            success_rate = ?
                         WHERE session_id = ?
                     """, (
                         end_time.isoformat(),
                         session_summary.total_messages,
                         session_summary.successful_messages,
                         session_summary.failed_messages,
+                        session_summary.pending_messages,
+                        session_summary.cancelled_messages,
+                        session_summary.success_rate,
                         self.current_session_id
                     ))
                     conn.commit()
@@ -442,8 +456,6 @@ class MessageLogger:
         
         self.current_session_id = None
         self.session_start_time = None
-        
-        return session_summary
         
         return session_summary
     
@@ -867,20 +879,41 @@ class MessageLogger:
     
     def _row_to_session_summary(self, row: sqlite3.Row) -> SessionSummary:
         """Convert database row to SessionSummary."""
+        # Calculate average send time if we have the data
+        start_time = datetime.fromisoformat(row['start_time'])
+        end_time = datetime.fromisoformat(row['end_time']) if row['end_time'] else None
+        
+        if end_time and row['total_messages'] > 0:
+            duration = (end_time - start_time).total_seconds()
+            avg_send_time = duration / row['total_messages']
+        else:
+            avg_send_time = 0.0
+        
+        # Get errors for this session
+        try:
+            with sqlite3.connect(str(self.db_path)) as conn:
+                cursor = conn.execute("""
+                    SELECT error_message FROM message_logs 
+                    WHERE session_id = ? AND error_message IS NOT NULL
+                """, (row['session_id'],))
+                errors = [error_row[0] for error_row in cursor.fetchall()]
+        except:
+            errors = []
+        
         return SessionSummary(
             session_id=row['session_id'],
-            start_time=datetime.fromisoformat(row['start_time']),
-            end_time=datetime.fromisoformat(row['end_time']) if row['end_time'] else None,
-            channel=row['channel'],
-            template_used=row['template_used'],
+            start_time=start_time,
+            end_time=end_time,
+            channel=row['channel'] or 'email',
+            template_used=row['template_used'] or 'Unknown',
             total_messages=row['total_messages'],
             successful_messages=row['successful_messages'],
             failed_messages=row['failed_messages'],
-            pending_messages=row['pending_messages'],
-            cancelled_messages=row['cancelled_messages'],
-            success_rate=row['success_rate'],
-            average_send_time=row['average_send_time'],
-            errors=json.loads(row['errors']) if row['errors'] else [],
+            pending_messages=row['pending_messages'] or 0,
+            cancelled_messages=row['cancelled_messages'] or 0,
+            success_rate=row['success_rate'] or 0.0,
+            average_send_time=avg_send_time,
+            errors=errors,
             user_id=row['user_id']
         )
     

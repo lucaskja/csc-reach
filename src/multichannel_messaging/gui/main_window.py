@@ -22,6 +22,7 @@ from ..core.csv_processor import CSVProcessor
 from ..core.models import Customer, MessageTemplate, MessageChannel
 from ..core.template_manager import TemplateManager
 from ..services.email_service import EmailService
+from ..services.logged_email_service import LoggedEmailService
 from ..services.whatsapp_local_service import LocalWhatsAppBusinessService
 from ..services.whatsapp_web_service import WhatsAppWebService
 from .template_library_dialog import TemplateLibraryDialog
@@ -62,7 +63,15 @@ class EmailSendingThread(QThread):
                     return
                 
                 try:
-                    success = self.email_service.send_email(customer, self.template)
+                    # Check if we're using LoggedEmailService or regular EmailService
+                    if hasattr(self.email_service, 'send_single_email'):
+                        # Using LoggedEmailService
+                        message_record = self.email_service.send_single_email(customer, self.template)
+                        success = message_record.status.value == 'sent'
+                    else:
+                        # Using regular EmailService
+                        success = self.email_service.send_email(customer, self.template)
+                    
                     if success:
                         successful += 1
                         self.email_sent.emit(customer.email, True, "Sent successfully")
@@ -89,6 +98,62 @@ class EmailSendingThread(QThread):
     def stop(self):
         """Stop the sending process."""
         self.should_stop = True
+
+
+class LoggedEmailSendingThread(QThread):
+    """Thread for sending emails using LoggedEmailService with comprehensive logging."""
+    
+    progress_updated = Signal(int, int)  # current, total
+    email_sent = Signal(str, bool, str)  # email, success, message
+    finished = Signal(bool, str)  # success, message
+    
+    def __init__(self, customers: List[Customer], template: MessageTemplate, logged_email_service):
+        super().__init__()
+        self.customers = customers
+        self.template = template
+        self.logged_email_service = logged_email_service
+        self.should_stop = False
+    
+    def run(self):
+        """Run the email sending process using LoggedEmailService."""
+        try:
+            # Set up progress callback for LoggedEmailService
+            def progress_callback(current, total, message):
+                self.progress_updated.emit(current, total)
+            
+            self.logged_email_service.set_progress_callback(progress_callback)
+            
+            # Use the bulk email functionality of LoggedEmailService
+            message_records = self.logged_email_service.send_bulk_emails(
+                customers=self.customers,
+                template=self.template,
+                batch_size=10,
+                delay_between_emails=1.0
+            )
+            
+            # Emit individual email results
+            successful = 0
+            failed = 0
+            for record in message_records:
+                if record.status.value == 'sent':
+                    successful += 1
+                    self.email_sent.emit(record.customer.email, True, "Sent successfully")
+                else:
+                    failed += 1
+                    error_msg = record.error_message or "Failed to send"
+                    self.email_sent.emit(record.customer.email, False, error_msg)
+            
+            message = f"Completed: {successful} successful, {failed} failed"
+            self.finished.emit(True, message)
+            
+        except Exception as e:
+            self.finished.emit(False, f"Sending failed: {e}")
+    
+    def stop(self):
+        """Stop the sending process."""
+        self.should_stop = True
+        # Note: LoggedEmailService doesn't currently support cancellation
+        # This would need to be implemented in the service
 
 
 class MainWindow(QMainWindow):
@@ -483,7 +548,10 @@ class MainWindow(QMainWindow):
     def setup_services(self):
         """Set up external services."""
         try:
-            self.email_service = EmailService()
+            if self.message_logger:
+                self.email_service = LoggedEmailService(self.message_logger)
+            else:
+                self.email_service = EmailService()
             platform_info = self.email_service.get_platform_info()
             logger.info(f"Email service initialized successfully for {platform_info}")
         except Exception as e:
@@ -1479,7 +1547,14 @@ CSC-Reach streamlines business communication processes with professional email t
         if self.sending_thread and self.sending_thread.isRunning():
             return
         
-        self.sending_thread = EmailSendingThread(customers, self.current_template, self.email_service)
+        # Use LoggedEmailService bulk functionality if available
+        if hasattr(self.email_service, 'send_bulk_emails'):
+            # Use a simpler thread for LoggedEmailService
+            self.sending_thread = LoggedEmailSendingThread(customers, self.current_template, self.email_service)
+        else:
+            # Fallback to original thread
+            self.sending_thread = EmailSendingThread(customers, self.current_template, self.email_service)
+        
         self.sending_thread.progress_updated.connect(self.update_progress)
         self.sending_thread.email_sent.connect(self.on_email_sent)
         self.sending_thread.finished.connect(self.on_sending_finished)

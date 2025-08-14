@@ -1,11 +1,18 @@
 # Technology Stack & Build System
 
 ## Core Technologies
-- **Python 3.8+** - Main application language
-- **PySide6** - Cross-platform GUI framework (Qt-based)
-- **pandas** - CSV processing and data manipulation
-- **PyYAML** - Configuration management
-- **colorlog** - Enhanced logging with color support
+- **Python 3.8+**: Core application language
+- **PySide6**: Cross-platform GUI framework
+- **Microsoft Outlook Integration**:
+  - **macOS**: AppleScript via ScriptingBridge
+  - **Windows**: COM automation via pywin32
+
+## Key Components
+- **ConfigManager**: Application configuration management
+- **I18nManager**: Internationalization and localization
+- **TemplateManager**: Template management system
+- **EmailService**: Outlook integration service
+- **CSVProcessor**: CSV file processing
 
 ## Platform-Specific Dependencies
 ### Windows
@@ -76,3 +83,37 @@ make run
 - **DMG** creation for macOS distribution
 - **ZIP** packaging for Windows distribution
 - Cross-platform build verification and testing
+
+## Code Quality Standards
+- Follow PEP 8 style guidelines
+- Use type hints where appropriate
+- Include comprehensive docstrings
+- Implement proper error handling
+- Add logging using the project's logger: `from ..utils.logger import get_logger`
+
+## Testing Requirements
+- Unit tests for all new functionality
+- Integration tests for complex workflows
+- Place test files in correct `tests/` subdirectories
+- Use descriptive test names and comprehensive assertions
+- Include test fixtures in `tests/fixtures/` when needed
+
+## Common Mistakes to Avoid
+
+### ❌ Don't Do
+- Place test files in project root
+- Hard-code user-facing strings
+- Skip internationalization
+- Ignore project structure
+- Create files without proper documentation
+- Skip error handling
+- Forget to update README.md
+
+### ✅ Do
+- Follow established project structure
+- Internationalize all user-facing text
+- Place tests in correct directories
+- Update documentation
+- Add comprehensive error handling
+- Use existing logging system
+- Follow code quality standards
