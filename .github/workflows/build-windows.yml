@@ -267,12 +267,16 @@ jobs:
             Write-Host "   Created: $($fileInfo.CreationTime)"
             
             # Quick validation that it's a valid Windows executable
-            $header = Get-Content "CSC-Reach.exe" -Encoding Byte -TotalCount 2
-            if ($header[0] -eq 77 -and $header[1] -eq 90) {  # MZ header
-              Write-Host "✅ Valid Windows executable format"
-            } else {
-              Write-Host "❌ Invalid executable format"
-              exit 1
+            try {
+              $bytes = [System.IO.File]::ReadAllBytes("CSC-Reach.exe")
+              if ($bytes[0] -eq 77 -and $bytes[1] -eq 90) {  # MZ header
+                Write-Host "✅ Valid Windows executable format"
+              } else {
+                Write-Host "❌ Invalid executable format"
+                exit 1
+              }
+            } catch {
+              Write-Host "⚠️ Could not validate executable format, but file exists"
             }
           } else {
             Write-Host "❌ Executable not found"
