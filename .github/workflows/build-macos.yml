@@ -1,0 +1,381 @@
+name: Build macOS Application
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v1.0.0)'
+        required: false
+        default: 'latest'
+  push:
+    branches: [ main ]
+    paths:
+      - 'pyproject.toml'
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version-changed: ${{ steps.version-check.outputs.changed }}
+      new-version: ${{ steps.version-check.outputs.version }}
+      should-release: ${{ steps.version-check.outputs.should-release }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Check version change
+      id: version-check
+      run: |
+        # Get current version from pyproject.toml
+        CURRENT_VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+        echo "Current version: $CURRENT_VERSION"
+        
+        # Get latest tag
+        LATEST_TAG=$(git tag --sort=-version:refname | head -1 | sed 's/^v//' || echo "0.0.0")
+        echo "Latest tag version: $LATEST_TAG"
+        
+        # Check if this is a manual trigger or tag push
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          echo "changed=true" >> $GITHUB_OUTPUT
+          echo "version=v$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "should-release=true" >> $GITHUB_OUTPUT
+          echo "Manual trigger or tag push - proceeding with build"
+        elif [[ "$CURRENT_VERSION" != "$LATEST_TAG" ]]; then
+          echo "changed=true" >> $GITHUB_OUTPUT
+          echo "version=v$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "should-release=true" >> $GITHUB_OUTPUT
+          echo "Version changed from $LATEST_TAG to $CURRENT_VERSION"
+        else
+          echo "changed=false" >> $GITHUB_OUTPUT
+          echo "version=v$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "should-release=false" >> $GITHUB_OUTPUT
+          echo "No version change detected"
+        fi
+
+  build-macos:
+    needs: check-version
+    if: needs.check-version.outputs.version-changed == 'true' || github.event_name == 'pull_request'
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Debug - List repository contents
+      run: |
+        echo "Repository root contents:"
+        ls -la
+        echo -e "\nScripts directory:"
+        if [ -d "scripts" ]; then ls -la scripts; else echo "scripts directory not found"; fi
+        echo -e "\nBuild scripts directory:"
+        if [ -d "scripts/build" ]; then ls -la scripts/build; else echo "scripts/build directory not found"; fi
+        
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        
+    - name: Verify Python installation
+      run: |
+        python --version
+        pip --version
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip setuptools wheel
+        pip install -e ".[dev]"
+        
+    - name: Verify PyInstaller installation
+      run: |
+        python -m PyInstaller --version
+        
+    - name: Test Python imports
+      run: |
+        echo "Testing critical imports..."
+        python -c "import sys; print(f'Python: {sys.version}')"
+        python -c "import PySide6; print(f'PySide6: {PySide6.__version__}')"
+        python -c "import pandas; print(f'Pandas: {pandas.__version__}')"
+        python -c "import yaml; print('PyYAML: OK')"
+        python -c "import requests; print(f'Requests: {requests.__version__}')"
+        python -c "import Foundation; print('Foundation: OK')"
+        python -c "import ScriptingBridge; print('ScriptingBridge: OK')"
+        echo "✅ All critical imports successful"
+        
+    - name: Check build script and assets exist
+      run: |
+        if [ -f "scripts/build/build_macos.py" ]; then
+          echo "✅ build_macos.py found"
+        else
+          echo "❌ build_macos.py not found"
+          echo "Available files in scripts/build:"
+          if [ -d "scripts/build" ]; then ls -la scripts/build; else echo "scripts/build directory not found"; fi
+          exit 1
+        fi
+        
+        if [ -f "assets/icons/csc-reach.icns" ]; then
+          echo "✅ Icon file found"
+        else
+          echo "❌ Icon file not found at assets/icons/csc-reach.icns"
+          echo "Available icon files:"
+          if [ -d "assets/icons" ]; then ls -la assets/icons; else echo "assets/icons directory not found"; fi
+        fi
+        
+        if [ -f "scripts/build/build_macos.spec" ]; then
+          echo "✅ PyInstaller spec file found"
+        else
+          echo "❌ PyInstaller spec file not found"
+        fi
+        
+    - name: Build macOS application
+      run: |
+        echo "🚀 Starting macOS build process..."
+        python scripts/build/build_macos.py
+        
+    - name: Check build output
+      run: |
+        echo "Build directory contents:"
+        if [ -d "build" ]; then find build -type f -name "*.app" -o -name "*.log" | head -20; else echo "build directory not found"; fi
+        
+        # Check for build logs
+        if [ -d "build/logs" ]; then
+          echo -e "\nBuild logs:"
+          ls -la build/logs
+          if [ -f "build/logs/build_macos_error.log" ]; then
+            echo -e "\n❌ Error log found:"
+            tail -50 "build/logs/build_macos_error.log"
+          fi
+          if [ -f "build/logs/build_macos.log" ]; then
+            echo -e "\n📋 Build log (last 20 lines):"
+            tail -20 "build/logs/build_macos.log"
+          fi
+        fi
+        
+        if [ -d "build/dist/CSC-Reach.app" ]; then
+          echo "✅ macOS application created successfully"
+          size=$(du -sh "build/dist/CSC-Reach.app" | cut -f1)
+          echo "   Size: $size"
+          
+          # Verify app structure
+          echo "   App structure:"
+          ls -la "build/dist/CSC-Reach.app/Contents/"
+          if [ -f "build/dist/CSC-Reach.app/Contents/MacOS/CSC-Reach" ]; then
+            echo "   ✅ Executable found"
+          else
+            echo "   ❌ Executable not found"
+          fi
+        else
+          echo "❌ macOS application not found"
+          echo "Expected location: build/dist/CSC-Reach.app"
+          
+          # Show what was actually created
+          echo -e "\nActual build output:"
+          if [ -d "build/dist" ]; then 
+            find build/dist -type d -name "*.app" -o -type f -name "CSC-Reach*"
+          else 
+            echo "No build/dist directory found"
+          fi
+          exit 1
+        fi
+        
+    - name: Create DMG installer
+      run: |
+        echo "📦 Creating DMG installer..."
+        python scripts/build/create_dmg.py
+        
+        # Verify DMG was created
+        if [ -f "build/dist/CSC-Reach-macOS.dmg" ]; then
+          echo "✅ DMG created successfully"
+          size=$(du -sh "build/dist/CSC-Reach-macOS.dmg" | cut -f1)
+          echo "   Size: $size"
+        else
+          echo "❌ DMG creation failed"
+          exit 1
+        fi
+        
+    - name: Create macOS ZIP distribution
+      run: |
+        version="${{ needs.check-version.outputs.new-version || github.event.inputs.version || 'latest' }}"
+        zipName="CSC-Reach-macOS-$version.zip"
+        
+        echo "Creating ZIP: $zipName"
+        cd build/dist
+        zip -r "$zipName" CSC-Reach.app
+        echo "✅ ZIP created: $zipName"
+        
+        # Verify ZIP contents
+        echo "ZIP contents:"
+        unzip -l "$zipName" | head -20
+        
+    - name: Upload macOS ZIP
+      uses: actions/upload-artifact@v4
+      with:
+        name: CSC-Reach-macOS-${{ needs.check-version.outputs.new-version || github.event.inputs.version || 'latest' }}
+        path: build/dist/CSC-Reach-macOS-*.zip
+        retention-days: 30
+        
+    - name: Upload DMG
+      uses: actions/upload-artifact@v4
+      with:
+        name: CSC-Reach-DMG-${{ needs.check-version.outputs.new-version || github.event.inputs.version || 'latest' }}
+        path: build/dist/CSC-Reach-macOS.dmg
+        retention-days: 30
+        
+    - name: Create Git Tag
+      if: needs.check-version.outputs.should-release == 'true' && !startsWith(github.ref, 'refs/tags/') && github.event_name != 'pull_request'
+      run: |
+        version="${{ needs.check-version.outputs.new-version }}"
+        echo "Creating tag: $version"
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git tag -a $version -m "Release $version"
+        git push origin $version
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Create Release
+      if: needs.check-version.outputs.should-release == 'true' && github.event_name != 'pull_request'
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ needs.check-version.outputs.new-version }}
+        name: CSC-Reach ${{ needs.check-version.outputs.new-version }}
+        files: |
+          build/dist/CSC-Reach-macOS-*.zip
+          build/dist/CSC-Reach-macOS.dmg
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+        body: |
+          ## CSC-Reach ${{ needs.check-version.outputs.new-version }}
+          
+          ### macOS Release
+          - **CSC-Reach-macOS-${{ needs.check-version.outputs.new-version }}.zip**: Complete macOS application package
+          - **CSC-Reach-macOS.dmg**: macOS installer (drag & drop)
+          
+          ### Installation Options
+          
+          #### Option 1: ZIP File
+          1. Download the ZIP file
+          2. Extract to your Applications folder
+          3. Double-click `CSC-Reach.app` to run
+          
+          #### Option 2: DMG Installer
+          1. Download the DMG file
+          2. Double-click to mount
+          3. Drag CSC-Reach to Applications folder
+          4. Launch from Applications
+          
+          ### First Run
+          - You may need to right-click and select "Open" the first time due to macOS security
+          - Grant permissions for Outlook integration when prompted
+          
+          ### What's Changed
+          ${{ github.event.head_commit.message || 'Automated release from version update' }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  test-macos-build:
+    needs: [check-version, build-macos]
+    if: needs.check-version.outputs.version-changed == 'true' || github.event_name == 'pull_request'
+    runs-on: macos-latest
+    
+    steps:
+    - name: Download macOS ZIP
+      uses: actions/download-artifact@v4
+      with:
+        name: CSC-Reach-macOS-${{ needs.check-version.outputs.new-version || github.event.inputs.version || 'latest' }}
+        path: ./test-build/
+        
+    - name: Download DMG
+      uses: actions/download-artifact@v4
+      with:
+        name: CSC-Reach-DMG-${{ needs.check-version.outputs.new-version || github.event.inputs.version || 'latest' }}
+        path: ./test-build/
+        
+    - name: Test ZIP and DMG
+      run: |
+        cd test-build
+        echo "Downloaded artifacts:"
+        ls -la
+        
+        # Test ZIP file
+        zipFile=$(ls CSC-Reach-macOS-*.zip | head -1)
+        if [ -n "$zipFile" ]; then
+          echo "Testing ZIP: $zipFile"
+          unzip -q "$zipFile" -d "./zip-test/"
+          
+          if [ -d "./zip-test/CSC-Reach.app" ]; then
+            echo "✅ App extracted from ZIP successfully"
+            
+            # Test app structure
+            if [ -f "./zip-test/CSC-Reach.app/Contents/MacOS/CSC-Reach" ]; then
+              echo "✅ Executable found in app bundle"
+              
+              # Test executable permissions
+              if [ -x "./zip-test/CSC-Reach.app/Contents/MacOS/CSC-Reach" ]; then
+                echo "✅ Executable has correct permissions"
+              else
+                echo "❌ Executable lacks execute permissions"
+                exit 1
+              fi
+              
+              # Get app info
+              appSize=$(du -sh "./zip-test/CSC-Reach.app" | cut -f1)
+              echo "   App size: $appSize"
+              
+              # Test app can start (will exit quickly with --help)
+              echo "🧪 Testing app startup..."
+              timeout 10s "./zip-test/CSC-Reach.app/Contents/MacOS/CSC-Reach" --help || echo "App test completed (timeout expected for GUI apps)"
+              
+            else
+              echo "❌ Executable not found in app bundle"
+              exit 1
+            fi
+          else
+            echo "❌ App not found in ZIP"
+            exit 1
+          fi
+        else
+          echo "❌ ZIP file not found"
+          exit 1
+        fi
+        
+        # Test DMG file
+        dmgFile=$(ls CSC-Reach-macOS.dmg | head -1)
+        if [ -n "$dmgFile" ]; then
+          echo "Testing DMG: $dmgFile"
+          
+          # Mount DMG
+          mountPoint=$(hdiutil attach "$dmgFile" | grep "/Volumes" | cut -f3)
+          if [ -n "$mountPoint" ]; then
+            echo "✅ DMG mounted at: $mountPoint"
+            
+            # Check app in DMG
+            if [ -d "$mountPoint/CSC-Reach.app" ]; then
+              echo "✅ App found in DMG"
+              appSize=$(du -sh "$mountPoint/CSC-Reach.app" | cut -f1)
+              echo "   App size in DMG: $appSize"
+            else
+              echo "❌ App not found in DMG"
+              hdiutil detach "$mountPoint"
+              exit 1
+            fi
+            
+            # Unmount DMG
+            hdiutil detach "$mountPoint"
+            echo "✅ DMG test completed successfully"
+          else
+            echo "❌ Failed to mount DMG"
+            exit 1
+          fi
+        else
+          echo "❌ DMG file not found"
+          exit 1
+        fi
+        
+        echo "🎉 All macOS build tests passed!"

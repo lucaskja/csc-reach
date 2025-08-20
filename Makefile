@@ -34,6 +34,18 @@ help:
 	@echo "  clean            - Clean build artifacts"
 	@echo "  run              - Run the application"
 	@echo ""
+	@echo "🔢 Version Management:"
+	@echo "  version-check        - Show current version"
+	@echo "  version-patch        - Bump patch version (1.0.0 → 1.0.1)"
+	@echo "  version-minor        - Bump minor version (1.0.0 → 1.1.0)"
+	@echo "  version-major        - Bump major version (1.0.0 → 2.0.0)"
+	@echo "  version-dry-run-*    - Preview version changes"
+	@echo ""
+	@echo "🚀 Release Commands:"
+	@echo "  release-patch        - Bump patch version and trigger release"
+	@echo "  release-minor        - Bump minor version and trigger release"
+	@echo "  release-major        - Bump major version and trigger release"
+	@echo ""
 	@echo "📊 Utility Commands:"
 	@echo "  docs             - Show documentation structure"
 	@echo "  structure        - Show project structure"
@@ -186,6 +198,57 @@ build-status:
 	else \
 		echo "❌ No build directory found"; \
 	fi
+
+# Version management
+version-patch:
+	@echo "🔢 Bumping patch version..."
+	python scripts/bump_version.py patch
+
+version-minor:
+	@echo "🔢 Bumping minor version..."
+	python scripts/bump_version.py minor
+
+version-major:
+	@echo "🔢 Bumping major version..."
+	python scripts/bump_version.py major
+
+version-check:
+	@echo "🔍 Current version:"
+	@grep '^version = ' pyproject.toml
+
+version-dry-run-patch:
+	@echo "🔍 Patch version dry run:"
+	python scripts/bump_version.py patch --dry-run
+
+version-dry-run-minor:
+	@echo "🔍 Minor version dry run:"
+	python scripts/bump_version.py minor --dry-run
+
+version-dry-run-major:
+	@echo "🔍 Major version dry run:"
+	python scripts/bump_version.py major --dry-run
+
+# Release workflow (triggers both Windows and macOS builds)
+release-patch: version-patch
+	@echo "🚀 Creating patch release for all platforms..."
+	git add pyproject.toml
+	git commit -m "Bump version to $$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')"
+	git push origin main
+	@echo "✅ Patch release initiated. Check GitHub Actions for Windows and macOS build progress."
+
+release-minor: version-minor
+	@echo "🚀 Creating minor release for all platforms..."
+	git add pyproject.toml
+	git commit -m "Bump version to $$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')"
+	git push origin main
+	@echo "✅ Minor release initiated. Check GitHub Actions for Windows and macOS build progress."
+
+release-major: version-major
+	@echo "🚀 Creating major release for all platforms..."
+	git add pyproject.toml
+	git commit -m "Bump version to $$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')"
+	git push origin main
+	@echo "✅ Major release initiated. Check GitHub Actions for Windows and macOS build progress."
 
 # Advanced build options
 build-verbose:
