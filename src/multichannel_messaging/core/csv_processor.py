@@ -1,6 +1,7 @@
 """
-Advanced CSV file processing for Multi-Channel Bulk Messaging System.
+Advanced Table file processing for Multi-Channel Bulk Messaging System.
 Enhanced with robust encoding detection, intelligent parsing, and comprehensive validation.
+Supports CSV, Excel, Google Sheets, TSV, and other tabular formats.
 """
 
 import csv
@@ -12,11 +13,22 @@ from typing import List, Dict, Optional, Tuple, Any, Union, Iterator
 from dataclasses import dataclass, field
 from enum import Enum
 import codecs
+import json
 
 try:
     import chardet
 except ImportError:
     chardet = None
+
+try:
+    import openpyxl
+except ImportError:
+    openpyxl = None
+
+try:
+    import xlrd
+except ImportError:
+    xlrd = None
 
 from .models import Customer
 from .column_mapper import IntelligentColumnMapper, MappingResult, ColumnMapping
@@ -25,6 +37,19 @@ from ..utils.exceptions import CSVProcessingError, ValidationError
 from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+class FileFormat(Enum):
+    """Supported file formats."""
+    CSV = "csv"
+    TSV = "tsv"
+    EXCEL_XLSX = "xlsx"
+    EXCEL_XLS = "xls"
+    JSON = "json"
+    JSONL = "jsonl"
+    PIPE_DELIMITED = "pipe"
+    SEMICOLON_DELIMITED = "semicolon"
+    UNKNOWN = "unknown"
 
 
 class EncodingConfidence(Enum):
@@ -55,16 +80,23 @@ class DelimiterResult:
 
 
 @dataclass
-class CSVStructure:
-    """CSV file structure information."""
-    encoding: EncodingResult
-    delimiter: DelimiterResult
-    headers: List[str]
-    total_rows: int
-    sample_rows: List[Dict[str, Any]]
+class FileStructure:
+    """Table file structure information."""
+    file_format: FileFormat
+    encoding: Optional[EncodingResult] = None
+    delimiter: Optional[DelimiterResult] = None
+    headers: List[str] = field(default_factory=list)
+    total_rows: int = 0
+    sample_rows: List[Dict[str, Any]] = field(default_factory=list)
     has_header: bool = True
     quote_style: int = csv.QUOTE_MINIMAL
     line_terminator: str = '\n'
+    sheet_names: Optional[List[str]] = None  # For Excel files
+    active_sheet: Optional[str] = None  # For Excel files
+
+
+# Backward compatibility alias
+CSVStructure = FileStructure
 
 
 @dataclass
@@ -80,13 +112,15 @@ class ValidationIssue:
 
 
 @dataclass
-class CSVValidationReport:
-    """Comprehensive CSV validation report."""
+class TableValidationReport:
+    """Comprehensive table validation report."""
     total_rows: int
     valid_rows: int
+    file_format: FileFormat
     issues: List[ValidationIssue] = field(default_factory=list)
     encoding_issues: List[str] = field(default_factory=list)
     structure_issues: List[str] = field(default_factory=list)
+    format_issues: List[str] = field(default_factory=list)
     
     @property
     def error_count(self) -> int:
@@ -103,8 +137,12 @@ class CSVValidationReport:
         return (self.valid_rows / self.total_rows) * 100
 
 
-class AdvancedCSVProcessor:
-    """Advanced CSV file processor with enhanced parsing, validation, and error handling."""
+# Backward compatibility alias
+CSVValidationReport = TableValidationReport
+
+
+class AdvancedTableProcessor:
+    """Advanced table file processor supporting multiple formats with enhanced parsing, validation, and error handling."""
     
     # Enhanced column mappings with pattern recognition
     COLUMN_MAPPINGS = {
@@ -143,13 +181,133 @@ class AdvancedCSVProcessor:
     # Common delimiters to test
     COMMON_DELIMITERS = [',', ';', '\t', '|', ':']
     
+    # Supported file extensions and their formats
+    FORMAT_EXTENSIONS = {
+        '.csv': FileFormat.CSV,
+        '.tsv': FileFormat.TSV,
+        '.txt': FileFormat.CSV,  # Assume CSV for .txt files
+        '.xlsx': FileFormat.EXCEL_XLSX,
+        '.xls': FileFormat.EXCEL_XLS,
+        '.json': FileFormat.JSON,
+        '.jsonl': FileFormat.JSONL,
+        '.ndjson': FileFormat.JSONL,
+    }
+
     def __init__(self, enable_domain_checking: bool = True):
-        """Initialize advanced CSV processor."""
-        self.last_structure: Optional[CSVStructure] = None
-        self.validation_cache: Dict[str, CSVValidationReport] = {}
+        """Initialize advanced table processor."""
+        self.last_structure: Optional[FileStructure] = None
+        self.validation_cache: Dict[str, TableValidationReport] = {}
         self._encoding_cache: Dict[str, EncodingResult] = {}
         self.column_mapper = IntelligentColumnMapper()
         self.data_validator = AdvancedDataValidator(enable_domain_checking=enable_domain_checking)
+    
+    def detect_file_format(self, file_path: Path) -> FileFormat:
+        """
+        Detect file format based on extension and content analysis.
+        
+        Args:
+            file_path: Path to the file
+            
+        Returns:
+            Detected file format
+        """
+        try:
+            # First, try extension-based detection
+            extension = file_path.suffix.lower()
+            if extension in self.FORMAT_EXTENSIONS:
+                detected_format = self.FORMAT_EXTENSIONS[extension]
+                logger.debug(f"Format detected by extension: {detected_format.value}")
+                
+                # For ambiguous extensions, do content analysis
+                if extension in ['.txt', '.csv']:
+                    content_format = self._detect_format_by_content(file_path)
+                    if content_format != FileFormat.UNKNOWN:
+                        logger.debug(f"Format refined by content analysis: {content_format.value}")
+                        return content_format
+                
+                return detected_format
+            
+            # If extension is unknown, analyze content
+            content_format = self._detect_format_by_content(file_path)
+            if content_format != FileFormat.UNKNOWN:
+                logger.debug(f"Format detected by content analysis: {content_format.value}")
+                return content_format
+            
+            logger.warning(f"Could not detect format for {file_path}, defaulting to CSV")
+            return FileFormat.CSV
+            
+        except Exception as e:
+            logger.error(f"Format detection failed: {e}")
+            return FileFormat.UNKNOWN
+    
+    def _detect_format_by_content(self, file_path: Path) -> FileFormat:
+        """Detect format by analyzing file content."""
+        try:
+            # Read first few bytes to analyze
+            with open(file_path, 'rb') as f:
+                first_bytes = f.read(1024)
+            
+            # Try to decode as text
+            try:
+                # Try UTF-8 first
+                text_content = first_bytes.decode('utf-8')
+            except UnicodeDecodeError:
+                try:
+                    # Fall back to latin-1
+                    text_content = first_bytes.decode('latin-1')
+                except UnicodeDecodeError:
+                    return FileFormat.UNKNOWN
+            
+            # Check for JSON format
+            if text_content.strip().startswith(('{', '[')):
+                try:
+                    json.loads(text_content)
+                    return FileFormat.JSON
+                except json.JSONDecodeError:
+                    # Might be JSONL
+                    lines = text_content.strip().split('\n')
+                    if len(lines) > 1:
+                        try:
+                            json.loads(lines[0])
+                            return FileFormat.JSONL
+                        except json.JSONDecodeError:
+                            pass
+            
+            # Check for JSONL format (each line is JSON)
+            lines = text_content.strip().split('\n')
+            if len(lines) > 0:
+                try:
+                    json.loads(lines[0])
+                    return FileFormat.JSONL
+                except json.JSONDecodeError:
+                    pass
+            
+            # Analyze delimiter patterns
+            delimiter_counts = {
+                ',': text_content.count(','),
+                '\t': text_content.count('\t'),
+                ';': text_content.count(';'),
+                '|': text_content.count('|')
+            }
+            
+            # Find most common delimiter
+            max_delimiter = max(delimiter_counts.items(), key=lambda x: x[1])
+            
+            if max_delimiter[1] > 0:  # At least one delimiter found
+                if max_delimiter[0] == '\t':
+                    return FileFormat.TSV
+                elif max_delimiter[0] == ';':
+                    return FileFormat.SEMICOLON_DELIMITED
+                elif max_delimiter[0] == '|':
+                    return FileFormat.PIPE_DELIMITED
+                else:  # comma or default
+                    return FileFormat.CSV
+            
+            return FileFormat.UNKNOWN
+            
+        except Exception as e:
+            logger.debug(f"Content-based format detection failed: {e}")
+            return FileFormat.UNKNOWN
     
     def detect_encoding(self, file_path: Path, sample_size: int = 32768) -> EncodingResult:
         """
@@ -481,23 +639,221 @@ class AdvancedCSVProcessor:
         best_delimiter = max(scores.keys(), key=lambda d: scores[d])
         return DelimiterResult(best_delimiter, scores[best_delimiter], detected_by='pattern')
     
-    def analyze_file_structure(self, file_path: Path) -> CSVStructure:
+    def analyze_file_structure(self, file_path: Path, sheet_name: Optional[str] = None) -> FileStructure:
         """
-        Comprehensive CSV file structure analysis.
+        Comprehensive table file structure analysis supporting multiple formats.
         
         Args:
-            file_path: Path to CSV file
+            file_path: Path to table file
+            sheet_name: Sheet name for Excel files (optional)
             
         Returns:
-            CSVStructure with complete file analysis
+            FileStructure with complete file analysis
         """
+        try:
+            # Step 1: Detect file format
+            file_format = self.detect_file_format(file_path)
+            logger.debug(f"File format detected: {file_format.value}")
+            
+            # Step 2: Analyze based on format
+            if file_format in [FileFormat.EXCEL_XLSX, FileFormat.EXCEL_XLS]:
+                structure = self._analyze_excel_structure(file_path, file_format, sheet_name)
+            elif file_format == FileFormat.JSON:
+                structure = self._analyze_json_structure(file_path)
+            elif file_format == FileFormat.JSONL:
+                structure = self._analyze_jsonl_structure(file_path)
+            else:
+                # Handle CSV-like formats (CSV, TSV, pipe-delimited, etc.)
+                structure = self._analyze_csv_like_structure(file_path, file_format)
+            
+            self.last_structure = structure
+            logger.info(f"Analyzed {file_format.value}: {len(structure.headers)} columns, {structure.total_rows} rows")
+            
+            return structure
+            
+        except Exception as e:
+            logger.error(f"File structure analysis failed: {e}")
+            raise CSVProcessingError(f"Failed to analyze table file structure: {e}")
+    
+    def _analyze_excel_structure(self, file_path: Path, file_format: FileFormat, sheet_name: Optional[str] = None) -> FileStructure:
+        """Analyze Excel file structure."""
+        try:
+            # Check if required libraries are available
+            if file_format == FileFormat.EXCEL_XLSX and openpyxl is None:
+                raise CSVProcessingError("openpyxl library is required for .xlsx files. Install with: pip install openpyxl")
+            if file_format == FileFormat.EXCEL_XLS and xlrd is None:
+                raise CSVProcessingError("xlrd library is required for .xls files. Install with: pip install xlrd")
+            
+            # Read Excel file with pandas
+            if file_format == FileFormat.EXCEL_XLSX:
+                # Get sheet names first
+                excel_file = pd.ExcelFile(file_path, engine='openpyxl')
+            else:
+                excel_file = pd.ExcelFile(file_path, engine='xlrd')
+            
+            sheet_names = excel_file.sheet_names
+            active_sheet = sheet_name if sheet_name and sheet_name in sheet_names else sheet_names[0]
+            
+            # Read the specified sheet
+            df = pd.read_excel(file_path, sheet_name=active_sheet, engine='openpyxl' if file_format == FileFormat.EXCEL_XLSX else 'xlrd')
+            
+            # Clean up the dataframe
+            df = df.dropna(how='all')  # Remove completely empty rows
+            df = df.loc[:, ~df.columns.str.contains('^Unnamed')]  # Remove unnamed columns
+            
+            # Extract structure information
+            headers = [str(col) for col in df.columns.tolist()]
+            total_rows = len(df)
+            
+            # Get sample data
+            sample_size = min(5, total_rows)
+            sample_rows = []
+            for i in range(sample_size):
+                row_dict = {}
+                for col in headers:
+                    value = df.iloc[i][col]
+                    if pd.isna(value):
+                        row_dict[col] = ""
+                    else:
+                        row_dict[col] = str(value)
+                sample_rows.append(row_dict)
+            
+            return FileStructure(
+                file_format=file_format,
+                headers=headers,
+                total_rows=total_rows,
+                sample_rows=sample_rows,
+                has_header=True,
+                sheet_names=sheet_names,
+                active_sheet=active_sheet
+            )
+            
+        except Exception as e:
+            logger.error(f"Excel structure analysis failed: {e}")
+            raise CSVProcessingError(f"Failed to analyze Excel file: {e}")
+    
+    def _analyze_json_structure(self, file_path: Path) -> FileStructure:
+        """Analyze JSON file structure."""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            # Handle different JSON structures
+            if isinstance(data, list):
+                # Array of objects
+                if not data:
+                    return FileStructure(file_format=FileFormat.JSON, headers=[], total_rows=0, sample_rows=[])
+                
+                # Extract headers from first object
+                first_item = data[0]
+                if isinstance(first_item, dict):
+                    headers = list(first_item.keys())
+                    total_rows = len(data)
+                    
+                    # Get sample data
+                    sample_size = min(5, total_rows)
+                    sample_rows = []
+                    for i in range(sample_size):
+                        item = data[i]
+                        if isinstance(item, dict):
+                            row_dict = {key: str(item.get(key, "")) for key in headers}
+                            sample_rows.append(row_dict)
+                    
+                    return FileStructure(
+                        file_format=FileFormat.JSON,
+                        headers=headers,
+                        total_rows=total_rows,
+                        sample_rows=sample_rows,
+                        has_header=True
+                    )
+            
+            elif isinstance(data, dict):
+                # Single object - treat as one row
+                headers = list(data.keys())
+                sample_rows = [{key: str(data.get(key, "")) for key in headers}]
+                
+                return FileStructure(
+                    file_format=FileFormat.JSON,
+                    headers=headers,
+                    total_rows=1,
+                    sample_rows=sample_rows,
+                    has_header=True
+                )
+            
+            raise CSVProcessingError("Unsupported JSON structure - expected array of objects or single object")
+            
+        except json.JSONDecodeError as e:
+            raise CSVProcessingError(f"Invalid JSON format: {e}")
+        except Exception as e:
+            logger.error(f"JSON structure analysis failed: {e}")
+            raise CSVProcessingError(f"Failed to analyze JSON file: {e}")
+    
+    def _analyze_jsonl_structure(self, file_path: Path) -> FileStructure:
+        """Analyze JSONL (JSON Lines) file structure."""
+        try:
+            headers = set()
+            total_rows = 0
+            sample_rows = []
+            
+            with open(file_path, 'r', encoding='utf-8') as f:
+                for line_num, line in enumerate(f, 1):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    
+                    try:
+                        data = json.loads(line)
+                        if isinstance(data, dict):
+                            headers.update(data.keys())
+                            total_rows += 1
+                            
+                            # Collect sample data
+                            if len(sample_rows) < 5:
+                                sample_rows.append({key: str(data.get(key, "")) for key in data.keys()})
+                        else:
+                            logger.warning(f"Skipping non-object JSON at line {line_num}")
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"Invalid JSON at line {line_num}: {e}")
+                        continue
+            
+            headers_list = sorted(list(headers))
+            
+            # Normalize sample rows to have all headers
+            normalized_samples = []
+            for row in sample_rows:
+                normalized_row = {key: row.get(key, "") for key in headers_list}
+                normalized_samples.append(normalized_row)
+            
+            return FileStructure(
+                file_format=FileFormat.JSONL,
+                headers=headers_list,
+                total_rows=total_rows,
+                sample_rows=normalized_samples,
+                has_header=True
+            )
+            
+        except Exception as e:
+            logger.error(f"JSONL structure analysis failed: {e}")
+            raise CSVProcessingError(f"Failed to analyze JSONL file: {e}")
+    
+    def _analyze_csv_like_structure(self, file_path: Path, file_format: FileFormat) -> FileStructure:
+        """Analyze CSV-like file structure (CSV, TSV, pipe-delimited, etc.)."""
         try:
             # Step 1: Detect encoding
             encoding_result = self.detect_encoding(file_path)
             logger.debug(f"Encoding detection: {encoding_result.encoding} ({encoding_result.confidence.value})")
             
-            # Step 2: Detect delimiter
-            delimiter_result = self.detect_delimiter(file_path, encoding_result.encoding)
+            # Step 2: Determine delimiter based on format
+            if file_format == FileFormat.TSV:
+                delimiter_result = DelimiterResult('\t', 1.0, detected_by='format_based')
+            elif file_format == FileFormat.SEMICOLON_DELIMITED:
+                delimiter_result = DelimiterResult(';', 1.0, detected_by='format_based')
+            elif file_format == FileFormat.PIPE_DELIMITED:
+                delimiter_result = DelimiterResult('|', 1.0, detected_by='format_based')
+            else:
+                # Detect delimiter for CSV and unknown formats
+                delimiter_result = self.detect_delimiter(file_path, encoding_result.encoding)
+            
             logger.debug(f"Delimiter detection: '{delimiter_result.delimiter}' (confidence: {delimiter_result.confidence:.2f})")
             
             # Step 3: Analyze structure with streaming approach
@@ -507,14 +863,14 @@ class AdvancedCSVProcessor:
                 delimiter_result
             )
             
-            self.last_structure = structure
-            logger.info(f"Analyzed CSV: {len(structure.headers)} columns, {structure.total_rows} rows")
+            # Update format
+            structure.file_format = file_format
             
             return structure
             
         except Exception as e:
-            logger.error(f"File structure analysis failed: {e}")
-            raise CSVProcessingError(f"Failed to analyze CSV file structure: {e}")
+            logger.error(f"CSV-like structure analysis failed: {e}")
+            raise CSVProcessingError(f"Failed to analyze CSV-like file structure: {e}")
     
     def _analyze_structure_streaming(
         self, 
@@ -522,7 +878,7 @@ class AdvancedCSVProcessor:
         encoding_result: EncodingResult,
         delimiter_result: DelimiterResult,
         sample_rows: int = 5
-    ) -> CSVStructure:
+    ) -> FileStructure:
         """Analyze CSV structure using streaming approach for memory efficiency."""
         
         headers = []
@@ -556,7 +912,8 @@ class AdvancedCSVProcessor:
                     
                 except StopIteration:
                     # Empty file
-                    return CSVStructure(
+                    return FileStructure(
+                        file_format=FileFormat.CSV,
                         encoding=encoding_result,
                         delimiter=delimiter_result,
                         headers=[],
@@ -582,7 +939,8 @@ class AdvancedCSVProcessor:
                             sample_data.append(row_dict)
                             sample_count += 1
             
-            return CSVStructure(
+            return FileStructure(
+                file_format=FileFormat.CSV,  # Will be updated by caller
                 encoding=encoding_result,
                 delimiter=delimiter_result,
                 headers=headers,
@@ -631,26 +989,144 @@ class AdvancedCSVProcessor:
         header_ratio = header_indicators / total_columns if total_columns > 0 else 0
         return header_ratio > 0.3
     
-    def stream_csv_rows(
+    def stream_table_rows(
         self, 
         file_path: Path, 
-        structure: Optional[CSVStructure] = None,
-        chunk_size: int = 1000
+        structure: Optional[FileStructure] = None,
+        chunk_size: int = 1000,
+        sheet_name: Optional[str] = None
     ) -> Iterator[List[Dict[str, Any]]]:
         """
-        Stream CSV rows in chunks for memory-efficient processing.
+        Stream table rows in chunks for memory-efficient processing.
+        Supports CSV, Excel, JSON, JSONL, and other formats.
         
         Args:
-            file_path: Path to CSV file
-            structure: Pre-analyzed CSV structure (optional)
+            file_path: Path to table file
+            structure: Pre-analyzed file structure (optional)
             chunk_size: Number of rows per chunk
+            sheet_name: Sheet name for Excel files (optional)
             
         Yields:
-            Chunks of CSV rows as dictionaries
+            Chunks of table rows as dictionaries
         """
         if structure is None:
-            structure = self.analyze_file_structure(file_path)
+            structure = self.analyze_file_structure(file_path, sheet_name)
         
+        try:
+            if structure.file_format in [FileFormat.EXCEL_XLSX, FileFormat.EXCEL_XLS]:
+                yield from self._stream_excel_rows(file_path, structure, chunk_size, sheet_name)
+            elif structure.file_format == FileFormat.JSON:
+                yield from self._stream_json_rows(file_path, structure, chunk_size)
+            elif structure.file_format == FileFormat.JSONL:
+                yield from self._stream_jsonl_rows(file_path, structure, chunk_size)
+            else:
+                # Handle CSV-like formats
+                yield from self._stream_csv_like_rows(file_path, structure, chunk_size)
+                
+        except Exception as e:
+            logger.error(f"Table streaming failed: {e}")
+            raise CSVProcessingError(f"Failed to stream table rows: {e}")
+    
+    def _stream_excel_rows(self, file_path: Path, structure: FileStructure, chunk_size: int, sheet_name: Optional[str] = None) -> Iterator[List[Dict[str, Any]]]:
+        """Stream Excel rows in chunks."""
+        try:
+            active_sheet = sheet_name or structure.active_sheet
+            
+            # Use pandas to read in chunks (Excel doesn't support native chunking, so we read all and chunk)
+            df = pd.read_excel(file_path, sheet_name=active_sheet, 
+                             engine='openpyxl' if structure.file_format == FileFormat.EXCEL_XLSX else 'xlrd')
+            df = df.dropna(how='all')
+            
+            chunk = []
+            for index, row in df.iterrows():
+                row_dict = {}
+                for col in structure.headers:
+                    value = row.get(col, "")
+                    if pd.isna(value):
+                        row_dict[col] = ""
+                    else:
+                        row_dict[col] = str(value)
+                
+                row_dict['_row_number'] = index + 1
+                chunk.append(row_dict)
+                
+                if len(chunk) >= chunk_size:
+                    yield chunk
+                    chunk = []
+            
+            if chunk:
+                yield chunk
+                
+        except Exception as e:
+            logger.error(f"Excel streaming failed: {e}")
+            raise CSVProcessingError(f"Failed to stream Excel rows: {e}")
+    
+    def _stream_json_rows(self, file_path: Path, structure: FileStructure, chunk_size: int) -> Iterator[List[Dict[str, Any]]]:
+        """Stream JSON rows in chunks."""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            if isinstance(data, list):
+                chunk = []
+                for i, item in enumerate(data):
+                    if isinstance(item, dict):
+                        row_dict = {key: str(item.get(key, "")) for key in structure.headers}
+                        row_dict['_row_number'] = i + 1
+                        chunk.append(row_dict)
+                        
+                        if len(chunk) >= chunk_size:
+                            yield chunk
+                            chunk = []
+                
+                if chunk:
+                    yield chunk
+            
+            elif isinstance(data, dict):
+                # Single object
+                row_dict = {key: str(data.get(key, "")) for key in structure.headers}
+                row_dict['_row_number'] = 1
+                yield [row_dict]
+                
+        except Exception as e:
+            logger.error(f"JSON streaming failed: {e}")
+            raise CSVProcessingError(f"Failed to stream JSON rows: {e}")
+    
+    def _stream_jsonl_rows(self, file_path: Path, structure: FileStructure, chunk_size: int) -> Iterator[List[Dict[str, Any]]]:
+        """Stream JSONL rows in chunks."""
+        try:
+            chunk = []
+            row_number = 0
+            
+            with open(file_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    
+                    try:
+                        data = json.loads(line)
+                        if isinstance(data, dict):
+                            row_number += 1
+                            row_dict = {key: str(data.get(key, "")) for key in structure.headers}
+                            row_dict['_row_number'] = row_number
+                            chunk.append(row_dict)
+                            
+                            if len(chunk) >= chunk_size:
+                                yield chunk
+                                chunk = []
+                    except json.JSONDecodeError:
+                        continue
+            
+            if chunk:
+                yield chunk
+                
+        except Exception as e:
+            logger.error(f"JSONL streaming failed: {e}")
+            raise CSVProcessingError(f"Failed to stream JSONL rows: {e}")
+    
+    def _stream_csv_like_rows(self, file_path: Path, structure: FileStructure, chunk_size: int) -> Iterator[List[Dict[str, Any]]]:
+        """Stream CSV-like rows in chunks."""
         try:
             with open(file_path, 'r', encoding=structure.encoding.encoding, newline='') as f:
                 reader = csv.reader(
@@ -691,34 +1167,57 @@ class AdvancedCSVProcessor:
                     yield chunk
                     
         except Exception as e:
-            logger.error(f"CSV streaming failed: {e}")
-            raise CSVProcessingError(f"Failed to stream CSV rows: {e}")
+            logger.error(f"CSV-like streaming failed: {e}")
+            raise CSVProcessingError(f"Failed to stream CSV-like rows: {e}")
     
-    def validate_csv_comprehensive(
+    # Backward compatibility alias
+    def stream_csv_rows(self, file_path: Path, structure: Optional[FileStructure] = None, chunk_size: int = 1000) -> Iterator[List[Dict[str, Any]]]:
+        """Backward compatibility method for streaming CSV rows."""
+        return self.stream_table_rows(file_path, structure, chunk_size)
+    
+    def validate_table_comprehensive(
         self, 
         file_path: Path, 
-        structure: Optional[CSVStructure] = None
-    ) -> CSVValidationReport:
+        structure: Optional[FileStructure] = None,
+        sheet_name: Optional[str] = None
+    ) -> TableValidationReport:
         """
-        Comprehensive CSV validation with detailed error reporting.
+        Comprehensive table validation with detailed error reporting.
+        Supports CSV, Excel, JSON, JSONL, and other formats.
         
         Args:
-            file_path: Path to CSV file
-            structure: Pre-analyzed CSV structure (optional)
+            file_path: Path to table file
+            structure: Pre-analyzed file structure (optional)
+            sheet_name: Sheet name for Excel files (optional)
             
         Returns:
             Detailed validation report
         """
         if structure is None:
-            structure = self.analyze_file_structure(file_path)
+            structure = self.analyze_file_structure(file_path, sheet_name)
         
-        report = CSVValidationReport(total_rows=structure.total_rows, valid_rows=0)
+        report = TableValidationReport(
+            total_rows=structure.total_rows, 
+            valid_rows=0,
+            file_format=structure.file_format
+        )
         
-        # Validate encoding
-        if structure.encoding.confidence == EncodingConfidence.FALLBACK:
+        # Validate encoding (for text-based formats)
+        if structure.encoding and structure.encoding.confidence == EncodingConfidence.FALLBACK:
             report.encoding_issues.append(
                 f"Low confidence encoding detection: {structure.encoding.encoding}"
             )
+        
+        # Format-specific validation
+        if structure.file_format in [FileFormat.EXCEL_XLSX, FileFormat.EXCEL_XLS]:
+            if not structure.sheet_names:
+                report.format_issues.append("No sheets found in Excel file")
+            elif structure.active_sheet not in structure.sheet_names:
+                report.format_issues.append(f"Sheet '{structure.active_sheet}' not found in Excel file")
+        
+        elif structure.file_format in [FileFormat.JSON, FileFormat.JSONL]:
+            # JSON-specific validation is handled during structure analysis
+            pass
         
         # Validate structure
         if not structure.headers:
@@ -743,7 +1242,7 @@ class AdvancedCSVProcessor:
         
         # Validate data rows
         valid_count = 0
-        for chunk in self.stream_csv_rows(file_path, structure, chunk_size=500):
+        for chunk in self.stream_table_rows(file_path, structure, chunk_size=500, sheet_name=sheet_name):
             for row_data in chunk:
                 row_number = row_data.get('_row_number', 0)
                 
@@ -760,6 +1259,11 @@ class AdvancedCSVProcessor:
                    f"{report.error_count} errors, {report.warning_count} warnings")
         
         return report
+    
+    # Backward compatibility alias
+    def validate_csv_comprehensive(self, file_path: Path, structure: Optional[FileStructure] = None) -> TableValidationReport:
+        """Backward compatibility method for CSV validation."""
+        return self.validate_table_comprehensive(file_path, structure)
     
     def _validate_row_comprehensive(
         self, 
@@ -932,19 +1436,22 @@ class AdvancedCSVProcessor:
         self, 
         file_path: Path, 
         column_mapping: Optional[Dict[str, str]] = None,
-        structure: Optional[CSVStructure] = None,
+        structure: Optional[FileStructure] = None,
         validate_data: bool = True,
-        stream_processing: bool = False
-    ) -> Tuple[List[Customer], CSVValidationReport]:
+        stream_processing: bool = False,
+        sheet_name: Optional[str] = None
+    ) -> Tuple[List[Customer], TableValidationReport]:
         """
         Advanced customer loading with comprehensive validation and error reporting.
+        Supports CSV, Excel, JSON, JSONL, and other formats.
         
         Args:
-            file_path: Path to CSV file
+            file_path: Path to table file
             column_mapping: Manual column mapping (optional)
-            structure: Pre-analyzed CSV structure (optional)
+            structure: Pre-analyzed file structure (optional)
             validate_data: Whether to perform comprehensive validation
             stream_processing: Use streaming for large files
+            sheet_name: Sheet name for Excel files (optional)
             
         Returns:
             Tuple of (valid customers, validation report)
@@ -952,7 +1459,7 @@ class AdvancedCSVProcessor:
         try:
             # Analyze file structure if not provided
             if structure is None:
-                structure = self.analyze_file_structure(file_path)
+                structure = self.analyze_file_structure(file_path, sheet_name)
             
             # Get column mapping
             if column_mapping is None:
@@ -971,18 +1478,19 @@ class AdvancedCSVProcessor:
             # Perform comprehensive validation if requested
             validation_report = None
             if validate_data:
-                validation_report = self.validate_csv_comprehensive(file_path, structure)
+                validation_report = self.validate_table_comprehensive(file_path, structure, sheet_name)
             else:
-                validation_report = CSVValidationReport(
+                validation_report = TableValidationReport(
                     total_rows=structure.total_rows,
-                    valid_rows=0  # Will be updated during processing
+                    valid_rows=0,  # Will be updated during processing
+                    file_format=structure.file_format
                 )
             
             # Load customers using appropriate method
             if stream_processing or structure.total_rows > 5000:
-                customers = self._load_customers_streaming(file_path, structure, column_mapping, validation_report)
+                customers = self._load_customers_streaming(file_path, structure, column_mapping, validation_report, sheet_name)
             else:
-                customers = self._load_customers_batch(file_path, structure, column_mapping, validation_report)
+                customers = self._load_customers_batch(file_path, structure, column_mapping, validation_report, sheet_name)
             
             validation_report.valid_rows = len(customers)
             
@@ -998,14 +1506,15 @@ class AdvancedCSVProcessor:
     def _load_customers_streaming(
         self, 
         file_path: Path, 
-        structure: CSVStructure,
+        structure: FileStructure,
         column_mapping: Dict[str, str],
-        validation_report: CSVValidationReport
+        validation_report: TableValidationReport,
+        sheet_name: Optional[str] = None
     ) -> List[Customer]:
         """Load customers using streaming approach for memory efficiency."""
         customers = []
         
-        for chunk in self.stream_csv_rows(file_path, structure, chunk_size=1000):
+        for chunk in self.stream_table_rows(file_path, structure, chunk_size=1000, sheet_name=sheet_name):
             for row_data in chunk:
                 try:
                     # Extract customer data
@@ -1031,21 +1540,35 @@ class AdvancedCSVProcessor:
     def _load_customers_batch(
         self, 
         file_path: Path, 
-        structure: CSVStructure,
+        structure: FileStructure,
         column_mapping: Dict[str, str],
-        validation_report: CSVValidationReport
+        validation_report: TableValidationReport,
+        sheet_name: Optional[str] = None
     ) -> List[Customer]:
         """Load customers using batch approach for smaller files."""
         customers = []
         
         try:
-            # Read entire file with pandas for batch processing
-            df = pd.read_csv(
-                file_path, 
-                encoding=structure.encoding.encoding,
-                delimiter=structure.delimiter.delimiter,
-                quotechar=structure.delimiter.quote_char
-            )
+            # Read file based on format
+            if structure.file_format in [FileFormat.EXCEL_XLSX, FileFormat.EXCEL_XLS]:
+                active_sheet = sheet_name or structure.active_sheet
+                df = pd.read_excel(
+                    file_path, 
+                    sheet_name=active_sheet,
+                    engine='openpyxl' if structure.file_format == FileFormat.EXCEL_XLSX else 'xlrd'
+                )
+            elif structure.file_format == FileFormat.JSON:
+                df = pd.read_json(file_path)
+            elif structure.file_format == FileFormat.JSONL:
+                df = pd.read_json(file_path, lines=True)
+            else:
+                # CSV-like formats
+                df = pd.read_csv(
+                    file_path, 
+                    encoding=structure.encoding.encoding,
+                    delimiter=structure.delimiter.delimiter,
+                    quotechar=structure.delimiter.quote_char
+                )
             
             # Remove completely empty rows
             df = df.dropna(how='all')
@@ -1130,15 +1653,16 @@ class AdvancedCSVProcessor:
             logger.error(f"Failed to load customers from CSV: {e}")
             raise CSVProcessingError(f"Failed to load customers from CSV: {e}")
     
-    def validate_csv_format(self, file_path: Path) -> Dict[str, Any]:
+    def validate_table_format(self, file_path: Path, sheet_name: Optional[str] = None) -> Dict[str, Any]:
         """
-        Validate CSV file format and structure (backward compatibility method).
+        Validate table file format and structure supporting multiple formats.
         
         Args:
-            file_path: Path to CSV file
+            file_path: Path to table file
+            sheet_name: Sheet name for Excel files (optional)
             
         Returns:
-            Validation results in legacy format
+            Validation results with format information
         """
         try:
             if not file_path.exists():
@@ -1147,37 +1671,46 @@ class AdvancedCSVProcessor:
                     'errors': ['File does not exist']
                 }
             
-            if file_path.suffix.lower() not in ['.csv', '.txt']:
+            # Detect format
+            file_format = self.detect_file_format(file_path)
+            
+            # Check if format is supported
+            supported_extensions = list(self.FORMAT_EXTENSIONS.keys())
+            if file_path.suffix.lower() not in supported_extensions and file_format == FileFormat.UNKNOWN:
                 return {
                     'valid': False,
-                    'errors': ['File must be a CSV file (.csv or .txt)']
+                    'errors': [f'Unsupported file format. Supported formats: {", ".join(supported_extensions)}']
                 }
             
             # Use advanced validation
-            structure = self.analyze_file_structure(file_path)
-            validation_report = self.validate_csv_comprehensive(file_path, structure)
+            structure = self.analyze_file_structure(file_path, sheet_name)
+            validation_report = self.validate_table_comprehensive(file_path, structure, sheet_name)
             
             errors = []
             warnings = []
             
             # Convert structure issues to legacy format
             errors.extend(validation_report.structure_issues)
+            errors.extend(validation_report.format_issues)
             warnings.extend(validation_report.encoding_issues)
             
             # Check for critical validation errors
             if validation_report.error_count > validation_report.total_rows * 0.5:
                 errors.append(f"Too many validation errors: {validation_report.error_count} out of {validation_report.total_rows} rows")
             
-            # Create legacy analysis format
+            # Create analysis format
             column_mapping = self._detect_intelligent_column_mapping(structure.headers)
             analysis = {
-                'encoding': structure.encoding.encoding,
-                'delimiter': structure.delimiter.delimiter,
+                'file_format': file_format.value,
+                'encoding': structure.encoding.encoding if structure.encoding else 'N/A',
+                'delimiter': structure.delimiter.delimiter if structure.delimiter else 'N/A',
                 'columns': structure.headers,
                 'sample_data': structure.sample_rows,
                 'column_mapping': column_mapping,
                 'total_rows': structure.total_rows,
-                'required_columns_found': all(field in column_mapping for field in ['name', 'company', 'phone', 'email'])
+                'required_columns_found': all(field in column_mapping for field in ['name', 'company', 'phone', 'email']),
+                'sheet_names': structure.sheet_names,
+                'active_sheet': structure.active_sheet
             }
             
             return {
@@ -1192,6 +1725,11 @@ class AdvancedCSVProcessor:
                 'valid': False,
                 'errors': [f"Failed to validate file: {e}"]
             }
+    
+    # Backward compatibility alias
+    def validate_csv_format(self, file_path: Path) -> Dict[str, Any]:
+        """Backward compatibility method for CSV format validation."""
+        return self.validate_table_format(file_path)
     
     def export_template(self, file_path: Path, include_examples: bool = True) -> None:
         """
@@ -1262,7 +1800,7 @@ class AdvancedCSVProcessor:
             if len(preview_rows) < max_rows and structure.total_rows > len(preview_rows):
                 # Get additional rows
                 additional_needed = min(max_rows - len(preview_rows), structure.total_rows - len(preview_rows))
-                for chunk in self.stream_csv_rows(file_path, structure, chunk_size=additional_needed):
+                for chunk in self.stream_table_rows(file_path, structure, chunk_size=additional_needed):
                     for row in chunk[:additional_needed]:
                         if '_row_number' in row:
                             del row['_row_number']
@@ -1498,5 +2036,6 @@ class AdvancedCSVProcessor:
         }
 
 
-# Backward compatibility alias
-CSVProcessor = AdvancedCSVProcessor
+# Backward compatibility aliases
+AdvancedCSVProcessor = AdvancedTableProcessor
+CSVProcessor = AdvancedTableProcessor

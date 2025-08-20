@@ -9,7 +9,7 @@ This system caters to businesses needing to streamline their email communication
 ## 🎉 Current Status: Email Platform Completed
 
 ### ✅ **Fully Implemented Features:**
-- **CSV Import & Processing**: Automatic column detection, encoding support, data validation
+- **Multi-Format Data Import**: Support for CSV, Excel (XLSX/XLS), JSON, JSONL, TSV, and delimited files with automatic format detection, column mapping, and data validation
 - **Email Template System**: Subject/content editing with variable substitution (`{name}`, `{company}`)
 - **Cross-Platform Outlook Integration**: 
   - **macOS**: AppleScript integration with Microsoft Outlook
@@ -27,17 +27,42 @@ CSC-Reach is fully functional and ready for production use on both platforms:
 
 ## Key Features
 
-- **CSV file processing** (customer name, company name, telephone number, email)
+- **Multi-format file processing** - CSV, Excel, JSON, JSONL, TSV, and delimited files (customer name, company name, telephone number, email)
 - **Email composition and sending** via Outlook integration
 - **Cross-platform Outlook integration** (macOS AppleScript + Windows COM)
 - **Professional Template Management System** with library, categories, and import/export
 - **Multi-language support** (Portuguese, Spanish, English) with complete internationalization
 - **Cross-platform compatibility** (Windows and macOS)
 - **Daily messaging quota management** (100 per day per user) - *Framework ready*
-- **User-friendly interface** for CSV file input and template customization
+- **User-friendly interface** for multi-format file input and template customization
 - **Real-time progress tracking** and comprehensive logging
 - **Email preview functionality** before sending
 - **Draft email creation** for testing and review
+
+### Supported File Formats
+
+CSC-Reach supports importing customer data from multiple file formats:
+
+#### Text-Based Formats
+- **CSV** (Comma-Separated Values) - `.csv`, `.txt`
+- **TSV** (Tab-Separated Values) - `.tsv`
+- **Pipe-delimited** - `.txt` with `|` delimiter
+- **Semicolon-delimited** - `.txt` with `;` delimiter
+
+#### Spreadsheet Formats
+- **Excel XLSX** - `.xlsx` (modern Excel format)
+- **Excel XLS** - `.xls` (legacy Excel format)
+
+#### JSON Formats
+- **JSON** - `.json` (array of objects)
+- **JSONL/NDJSON** - `.jsonl`, `.ndjson` (JSON Lines format)
+
+**Key Benefits:**
+- **Automatic Format Detection** - No need to specify file type
+- **Intelligent Column Mapping** - Automatically maps columns to required fields
+- **Robust Encoding Detection** - Handles various text encodings
+- **Memory-Efficient Streaming** - Processes large files without memory issues
+- **Comprehensive Validation** - Detailed error reporting and suggestions
 
 ### Template Management Features
 - **Template Library**: Organize templates by categories (Welcome, Follow-up, Promotional, Support, General)
@@ -56,7 +81,7 @@ CSC-Reach is fully functional and ready for production use on both platforms:
 - **Microsoft Outlook Integration**:
   - **macOS**: AppleScript via ScriptingBridge
   - **Windows**: COM automation via pywin32
-- **CSV Processing**: pandas with automatic encoding detection
+- **Multi-Format Processing**: pandas with automatic format detection, encoding detection, and intelligent column mapping
 - **Configuration**: YAML/JSON with cross-platform storage
 - **Logging**: colorlog with file rotation
 - **Build System**: PyInstaller for executable creation
