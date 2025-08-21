@@ -773,5 +773,47 @@
   "database_not_found": "Banco de dados não encontrado",
   "database_info_error": "Erro ao carregar informações do banco de dados: {error}",
   "charts_not_available": "Gráficos não disponíveis - instale PySide6-Addons para suporte a gráficos",
-  "auto_refresh": "Atualização Automática (30s)"
+  "auto_refresh": "Atualização Automática (30s)",
+  
+  "_comment_whatsapp_api_enhanced": "=== TRADUÇÕES DA API WHATSAPP APRIMORADA ===",
+  
+  "whatsapp_api_client_initialized": "Cliente da API WhatsApp aprimorado inicializado",
+  "rate_limit_minute_exceeded": "Limite de taxa excedido: Muitas solicitações por minuto",
+  "rate_limit_hour_exceeded": "Limite de taxa excedido: Muitas solicitações por hora",
+  "rate_limit_day_exceeded": "Limite de taxa excedido: Cota diária atingida",
+  "rate_limit_max_retries_exceeded": "Limite de taxa excedido: Máximo de tentativas atingido",
+  "request_timeout_exceeded": "Timeout de solicitação excedido após máximo de tentativas",
+  "whatsapp_service_unavailable": "Serviço WhatsApp temporariamente indisponível",
+  "whatsapp_api_health_degraded": "Saúde da API WhatsApp está degradada",
+  "whatsapp_api_health_critical": "Saúde da API WhatsApp está crítica",
+  "whatsapp_connection_pool_exhausted": "Pool de conexões esgotado",
+  "whatsapp_quota_warning": "Aproximando do limite de cota WhatsApp",
+  "whatsapp_quota_exceeded": "Cota WhatsApp excedida",
+  "whatsapp_template_not_approved": "Modelo WhatsApp não aprovado",
+  "whatsapp_template_invalid": "Formato de modelo WhatsApp inválido",
+  "whatsapp_phone_invalid": "Formato de número de telefone WhatsApp inválido",
+  "whatsapp_message_too_long": "Mensagem WhatsApp excede limite de caracteres",
+  "whatsapp_delivery_failed": "Falha na entrega da mensagem WhatsApp",
+  "whatsapp_webhook_error": "Erro no processamento do webhook WhatsApp",
+  "whatsapp_analytics_unavailable": "Análises WhatsApp temporariamente indisponíveis",
+  
+  "_comment_rate_limiter": "=== TRADUÇÕES DO LIMITADOR DE TAXA ===",
+  
+  "rate_limiter_initialized": "Limitador de taxa inteligente inicializado",
+  "quota_critical_alert": "CRÍTICO: cota {quota_type} em {percentage:.1f}% ({usage}/{limit})",
+  "quota_warning_alert": "AVISO: cota {quota_type} em {percentage:.1f}% ({usage}/{limit})",
+  
+  "_comment_whatsapp_templates": "=== GERENCIAMENTO DE MODELOS WHATSAPP ===",
+  
+  "whatsapp_template_manager_initialized": "Gerenciador de modelos WhatsApp inicializado",
+  "template_recommendation_improve_delivery": "Considere melhorar o conteúdo da mensagem para aumentar as taxas de entrega",
+  "template_recommendation_improve_content": "Aprimore o conteúdo da mensagem para melhorar as taxas de leitura",
+  "template_recommendation_add_cta": "Adicione uma chamada para ação clara para melhorar as taxas de resposta",
+  "template_recommendation_increase_usage": "Considere usar este modelo com mais frequência para obter melhores análises",
+  
+  "_comment_delivery_webhook": "=== SISTEMA DE RASTREAMENTO DE ENTREGA E WEBHOOK ===",
+  
+  "delivery_tracker_initialized": "Rastreador de entrega de mensagens inicializado",
+  "webhook_manager_initialized": "Gerenciador de webhook WhatsApp inicializado",
+  "whatsapp_delivery_system_initialized": "Sistema de entrega WhatsApp inicializado"
 }

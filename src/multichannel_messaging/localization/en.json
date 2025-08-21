@@ -622,6 +622,52 @@
   "messages_per_minute": "Messages per minute:",
   "daily_message_limit": "Daily message limit:",
   "minimum_delay_messages": "Minimum delay between messages:",
+  "conservative_limits_help": "Conservative limits help avoid detection and account suspension",
+  
+  "_comment_whatsapp_api_enhanced": "=== ENHANCED WHATSAPP API TRANSLATIONS ===",
+  
+  "whatsapp_api_client_initialized": "Enhanced WhatsApp API client initialized",
+  "rate_limit_minute_exceeded": "Rate limit exceeded: Too many requests per minute",
+  "rate_limit_hour_exceeded": "Rate limit exceeded: Too many requests per hour", 
+  "rate_limit_day_exceeded": "Rate limit exceeded: Daily quota reached",
+  "rate_limit_max_retries_exceeded": "Rate limit exceeded: Maximum retries reached",
+  "request_timeout_exceeded": "Request timeout exceeded after maximum retries",
+  "whatsapp_service_unavailable": "WhatsApp service is temporarily unavailable",
+  "whatsapp_api_health_degraded": "WhatsApp API health is degraded",
+  "whatsapp_api_health_critical": "WhatsApp API health is critical",
+  "whatsapp_connection_pool_exhausted": "Connection pool exhausted",
+  "whatsapp_quota_warning": "Approaching WhatsApp quota limit",
+  "whatsapp_quota_exceeded": "WhatsApp quota exceeded",
+  "whatsapp_template_not_approved": "WhatsApp template not approved",
+  "whatsapp_template_invalid": "WhatsApp template format invalid",
+  "whatsapp_phone_invalid": "Invalid WhatsApp phone number format",
+  "whatsapp_message_too_long": "WhatsApp message exceeds character limit",
+  "whatsapp_delivery_failed": "WhatsApp message delivery failed",
+  "whatsapp_webhook_error": "WhatsApp webhook processing error",
+  "whatsapp_analytics_unavailable": "WhatsApp analytics temporarily unavailable",
+  
+  "_comment_rate_limiter": "=== RATE LIMITER TRANSLATIONS ===",
+  
+  "rate_limiter_initialized": "Intelligent rate limiter initialized",
+  "quota_critical_alert": "CRITICAL: {quota_type} quota at {percentage:.1f}% ({usage}/{limit})",
+  "quota_warning_alert": "WARNING: {quota_type} quota at {percentage:.1f}% ({usage}/{limit})",
+  
+  "_comment_whatsapp_templates": "=== WHATSAPP TEMPLATE MANAGEMENT ===",
+  
+  "whatsapp_template_manager_initialized": "WhatsApp template manager initialized",
+  "template_recommendation_improve_delivery": "Consider improving message content to increase delivery rates",
+  "template_recommendation_improve_content": "Enhance message content to improve read rates",
+  "template_recommendation_add_cta": "Add clear call-to-action to improve response rates",
+  "template_recommendation_increase_usage": "Consider using this template more frequently to gather better analytics",
+  
+  "_comment_delivery_webhook": "=== DELIVERY TRACKING AND WEBHOOK SYSTEM ===",
+  
+  "delivery_tracker_initialized": "Message delivery tracker initialized",
+  "webhook_manager_initialized": "WhatsApp webhook manager initialized",
+  "whatsapp_delivery_system_initialized": "WhatsApp delivery system initialized",
+  
+  "_comment_whatsapp_web_settings": "=== WHATSAPP WEB SETTINGS ===",
+  
   "conservative_limits_help": "Very conservative limits are enforced to reduce account suspension risk.\nThese limits are much lower than other services for safety.",
   "risk_acknowledgment": "Risk Acknowledgment",
   "ack_violate_tos": "I understand this may violate WhatsApp's Terms of Service",

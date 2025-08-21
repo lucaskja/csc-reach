@@ -773,5 +773,47 @@
   "database_not_found": "Base de datos no encontrada",
   "database_info_error": "Error al cargar información de la base de datos: {error}",
   "charts_not_available": "Gráficos no disponibles - instale PySide6-Addons para soporte de gráficos",
-  "auto_refresh": "Actualización Automática (30s)"
+  "auto_refresh": "Actualización Automática (30s)",
+  
+  "_comment_whatsapp_api_enhanced": "=== TRADUCCIONES DE API WHATSAPP MEJORADA ===",
+  
+  "whatsapp_api_client_initialized": "Cliente de API WhatsApp mejorado inicializado",
+  "rate_limit_minute_exceeded": "Límite de velocidad excedido: Demasiadas solicitudes por minuto",
+  "rate_limit_hour_exceeded": "Límite de velocidad excedido: Demasiadas solicitudes por hora",
+  "rate_limit_day_exceeded": "Límite de velocidad excedido: Cuota diaria alcanzada",
+  "rate_limit_max_retries_exceeded": "Límite de velocidad excedido: Máximo de reintentos alcanzado",
+  "request_timeout_exceeded": "Tiempo de espera de solicitud excedido después del máximo de reintentos",
+  "whatsapp_service_unavailable": "Servicio WhatsApp temporalmente no disponible",
+  "whatsapp_api_health_degraded": "La salud de la API WhatsApp está degradada",
+  "whatsapp_api_health_critical": "La salud de la API WhatsApp está crítica",
+  "whatsapp_connection_pool_exhausted": "Pool de conexiones agotado",
+  "whatsapp_quota_warning": "Acercándose al límite de cuota WhatsApp",
+  "whatsapp_quota_exceeded": "Cuota WhatsApp excedida",
+  "whatsapp_template_not_approved": "Plantilla WhatsApp no aprobada",
+  "whatsapp_template_invalid": "Formato de plantilla WhatsApp inválido",
+  "whatsapp_phone_invalid": "Formato de número de teléfono WhatsApp inválido",
+  "whatsapp_message_too_long": "Mensaje WhatsApp excede el límite de caracteres",
+  "whatsapp_delivery_failed": "Falló la entrega del mensaje WhatsApp",
+  "whatsapp_webhook_error": "Error en el procesamiento del webhook WhatsApp",
+  "whatsapp_analytics_unavailable": "Análisis WhatsApp temporalmente no disponible",
+  
+  "_comment_rate_limiter": "=== TRADUCCIONES DEL LIMITADOR DE VELOCIDAD ===",
+  
+  "rate_limiter_initialized": "Limitador de velocidad inteligente inicializado",
+  "quota_critical_alert": "CRÍTICO: cuota {quota_type} al {percentage:.1f}% ({usage}/{limit})",
+  "quota_warning_alert": "ADVERTENCIA: cuota {quota_type} al {percentage:.1f}% ({usage}/{limit})",
+  
+  "_comment_whatsapp_templates": "=== GESTIÓN DE PLANTILLAS WHATSAPP ===",
+  
+  "whatsapp_template_manager_initialized": "Gestor de plantillas WhatsApp inicializado",
+  "template_recommendation_improve_delivery": "Considere mejorar el contenido del mensaje para aumentar las tasas de entrega",
+  "template_recommendation_improve_content": "Mejore el contenido del mensaje para mejorar las tasas de lectura",
+  "template_recommendation_add_cta": "Agregue una llamada a la acción clara para mejorar las tasas de respuesta",
+  "template_recommendation_increase_usage": "Considere usar esta plantilla con más frecuencia para obtener mejores análisis",
+  
+  "_comment_delivery_webhook": "=== SISTEMA DE SEGUIMIENTO DE ENTREGA Y WEBHOOK ===",
+  
+  "delivery_tracker_initialized": "Rastreador de entrega de mensajes inicializado",
+  "webhook_manager_initialized": "Gestor de webhook WhatsApp inicializado",
+  "whatsapp_delivery_system_initialized": "Sistema de entrega WhatsApp inicializado"
 }
