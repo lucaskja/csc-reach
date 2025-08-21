@@ -22,6 +22,8 @@ class MessageStatus(Enum):
     PENDING = "pending"
     SENDING = "sending"
     SENT = "sent"
+    DELIVERED = "delivered"
+    READ = "read"
     FAILED = "failed"
     CANCELLED = "cancelled"
 

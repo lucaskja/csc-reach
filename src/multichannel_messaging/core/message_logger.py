@@ -209,11 +209,18 @@ class MessageLogger:
         for attempt in range(self._max_retries):
             try:
                 self._init_database()
-                self._database_available = True
-                self.logger.info(
-                    f"Message logger database initialized at: {self.db_path}"
-                )
-                return
+                
+                # Run database migrations
+                from .database_migration import migrate_message_logger_database
+                if migrate_message_logger_database(self.db_path):
+                    self._database_available = True
+                    self.logger.info(
+                        f"Message logger database initialized at: {self.db_path}"
+                    )
+                    return
+                else:
+                    raise Exception("Database migration failed")
+                    
             except Exception as e:
                 self.logger.warning(
                     f"Database initialization attempt {attempt + 1} failed: {e}"
