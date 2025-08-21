@@ -71,6 +71,14 @@ class SessionSummary:
     average_send_time: float  # seconds per message
     errors: List[str]
     user_id: str
+    channels_used: List[str] = None
+    templates_used: List[str] = None
+    
+    def __post_init__(self):
+        if self.channels_used is None:
+            self.channels_used = []
+        if self.templates_used is None:
+            self.templates_used = []
 
 
 @dataclass
@@ -792,7 +800,9 @@ class MessageLogger:
             success_rate=session_row['success_rate'],
             average_send_time=avg_send_time,
             errors=errors,
-            user_id=session_row['user_id']
+            user_id=session_row['user_id'],
+            channels_used=json.loads(session_row.get('channels_used', '[]')) if session_row.get('channels_used') else [],
+            templates_used=json.loads(session_row.get('templates_used', '[]')) if session_row.get('templates_used') else []
         )
     
     def _generate_analytics_report(self, report_id: str, start_date: datetime, 
@@ -914,7 +924,9 @@ class MessageLogger:
             success_rate=row['success_rate'] or 0.0,
             average_send_time=avg_send_time,
             errors=errors,
-            user_id=row['user_id']
+            user_id=row['user_id'],
+            channels_used=json.loads(row.get('channels_used', '[]')) if row.get('channels_used') else [],
+            templates_used=json.loads(row.get('templates_used', '[]')) if row.get('templates_used') else []
         )
     
     def _get_cached_report(self, report_id: str) -> Optional[AnalyticsReport]:

@@ -183,6 +183,36 @@ The application automatically detects and integrates with your installed Microso
 
 Ensure Outlook is installed and configured with your email account before using the application.
 
+### macOS Permissions Setup
+On macOS, CSC-Reach requires specific permissions to integrate with Microsoft Outlook:
+
+#### Required Permissions
+1. **Automation Permissions**: Allow CSC-Reach to control Microsoft Outlook
+   - Go to **System Preferences** → **Security & Privacy** → **Privacy** → **Automation**
+   - Find CSC-Reach and check **Microsoft Outlook**
+
+#### Optional Permissions (for enhanced functionality)
+2. **Accessibility**: For improved system integration
+3. **Full Disk Access**: For enhanced logging and file operations
+
+#### Quick Setup Verification
+Run the diagnostic script to check your setup:
+```bash
+python scripts/dev/macos_diagnostic.py
+```
+
+Or test the integration directly:
+```bash
+python scripts/dev/test_outlook_integration.py
+```
+
+📖 **Detailed Guide**: See [macOS Permissions Guide](docs/user/macos_permissions_guide.md) for step-by-step instructions with screenshots.
+
+#### Troubleshooting macOS Issues
+- **"Not authorized to send Apple events"**: Grant automation permissions as described above
+- **"Cannot start Outlook"**: Ensure Outlook is installed and try opening it manually first
+- **Permission prompts don't appear**: Reset permissions with `tccutil reset All com.yourcompany.csc-reach`
+
 ### WhatsApp Business API Setup (Future Enhancement)
 1. Obtain WhatsApp Business API credentials from the WhatsApp Business Platform
 2. In the application settings, navigate to "WhatsApp Configuration"

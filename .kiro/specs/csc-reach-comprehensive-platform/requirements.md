@@ -92,23 +92,6 @@ CSC-Reach is a comprehensive multi-channel communication platform designed for b
 6. WHEN WhatsApp opt-in is required THEN the system SHALL verify customer consent before sending
 7. WHEN message status is needed THEN the system SHALL track delivery and read receipts
 
-### Requirement 7: AWS End User Messaging Integration (Enhanced Implementation)
-
-**User Story:** As a business user, I want to leverage AWS End User Messaging for WhatsApp communication, so that I can benefit from AWS's scalable, secure, and compliant messaging infrastructure.
-
-#### Acceptance Criteria
-
-1. WHEN AWS End User Messaging is configured THEN the system SHALL authenticate using AWS credentials (IAM roles/keys)
-2. WHEN AWS regions are selected THEN the system SHALL support multiple AWS regions for compliance requirements
-3. WHEN WhatsApp messages are sent THEN the system SHALL use AWS End User Messaging APIs for delivery
-4. WHEN message templates are managed THEN the system SHALL sync with AWS template management
-5. WHEN compliance is required THEN the system SHALL leverage AWS compliance features (encryption, audit logs)
-6. WHEN scaling is needed THEN the system SHALL benefit from AWS auto-scaling capabilities
-7. WHEN monitoring is required THEN the system SHALL integrate with AWS CloudWatch for metrics and logging
-8. WHEN cost optimization is needed THEN the system SHALL provide AWS cost tracking and optimization features
-9. WHEN security is paramount THEN the system SHALL use AWS security best practices (VPC, encryption, IAM)
-10. WHEN disaster recovery is needed THEN the system SHALL leverage AWS multi-region capabilities
-
 ### Requirement 8: User Interface and Experience
 
 **User Story:** As a business user, I want an intuitive and professional user interface, so that I can efficiently manage my communication campaigns without technical complexity.

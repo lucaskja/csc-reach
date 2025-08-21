@@ -48,6 +48,11 @@ help:
 	@echo ""
 	@echo "📊 Utility Commands:"
 	@echo "  docs             - Show documentation structure"
+	@echo ""
+	@echo "🔍 Diagnostic Commands (macOS):"
+	@echo "  diagnose         - Run macOS diagnostic checks"
+	@echo "  test-outlook     - Test Outlook integration"
+	@echo "  check-permissions - Check macOS permissions"
 	@echo "  structure        - Show project structure"
 	@echo "  dist-summary     - Show distribution summary"
 	@echo "  build-status     - Show build status and logs"
@@ -281,3 +286,18 @@ build-help:
 	@echo ""
 	@echo "For quick building:"
 	@echo "  python build.py --help"
+
+# Diagnostic Commands (macOS)
+diagnose:
+	@echo "🔍 Running macOS diagnostic checks..."
+	python scripts/dev/macos_diagnostic.py
+
+test-outlook:
+	@echo "📧 Testing Outlook integration..."
+	python scripts/dev/test_outlook_integration.py
+
+check-permissions:
+	@echo "🔐 Checking macOS permissions..."
+	@echo "This will check if CSC-Reach has the necessary permissions to work with Outlook."
+	@echo "See docs/user/macos_permissions_guide.md for detailed setup instructions."
+	python scripts/dev/macos_diagnostic.py
