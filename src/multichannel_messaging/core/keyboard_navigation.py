@@ -139,7 +139,7 @@ class KeyboardNavigationManager(QObject):
         if not self.navigation_enabled:
             return False
         
-        key_sequence = QKeySequence(event.key() | int(event.modifiers()))
+        key_sequence = QKeySequence(event.key() | event.modifiers().value)
         key_string = key_sequence.toString()
         
         # Check global shortcuts first

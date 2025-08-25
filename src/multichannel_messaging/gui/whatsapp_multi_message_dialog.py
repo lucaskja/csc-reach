@@ -243,6 +243,8 @@ class MessagePreviewWidget(QWidget):
             phone="+1-555-0123",
             email="john.smith@acme.com"
         )
+        # Validate with all fields for sample data
+        self.sample_customer.validate(["name", "company", "phone", "email"])
         self.setup_ui()
     
     def setup_ui(self):

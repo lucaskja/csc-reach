@@ -46,8 +46,7 @@ class Customer:
         self.phone = self._format_phone_number(self.phone) if self.phone else ""
         self.email = self.email.strip().lower() if self.email else ""
         
-        # Validate data
-        self.validate()
+        # Skip validation in __post_init__ - let the caller decide what to validate
     
     def _format_phone_number(self, phone: str) -> str:
         """
@@ -76,36 +75,59 @@ class Customer:
         
         return cleaned
     
-    def validate(self) -> None:
+    def validate(self, required_fields: Optional[List[str]] = None) -> None:
         """
-        Validate customer data.
+        Validate customer data with flexible field requirements.
+        
+        Args:
+            required_fields: List of required field names. If None, uses default validation.
         
         Raises:
             ValidationError: If validation fails
         """
         errors = []
         
-        # Validate name
+        # Default required fields if not specified
+        if required_fields is None:
+            required_fields = ["name", "email", "phone", "company"]  # Backward compatibility
+        
+        # Validate name (always required)
         if not self.name or not self.name.strip():
             errors.append("Name is required")
         elif len(self.name.strip()) < 2:
             errors.append("Name must be at least 2 characters long")
         
-        # Validate company
-        if not self.company or not self.company.strip():
-            errors.append("Company is required")
+        # Validate company (only if required)
+        if "company" in required_fields:
+            if not self.company or not self.company.strip():
+                errors.append("Company is required")
         
-        # Validate email
-        if not self.email or not self.email.strip():
-            errors.append("Email is required")
-        elif not self._is_valid_email(self.email):
-            errors.append("Invalid email format")
+        # Validate email (only if required)
+        if "email" in required_fields:
+            if not self.email or not self.email.strip():
+                errors.append("Email is required")
+            elif self.email and not self._is_valid_email(self.email):
+                errors.append("Invalid email format")
+        elif self.email and self.email.strip():  # Validate format if provided
+            if not self._is_valid_email(self.email):
+                errors.append("Invalid email format")
         
-        # Validate phone (basic validation)
-        if not self.phone or not self.phone.strip():
-            errors.append("Phone is required")
-        elif not self._is_valid_phone(self.phone):
-            errors.append("Invalid phone format")
+        # Validate phone (only if required)
+        if "phone" in required_fields:
+            if not self.phone or not self.phone.strip():
+                errors.append("Phone is required")
+            elif self.phone and not self._is_valid_phone(self.phone):
+                errors.append("Invalid phone format")
+        elif self.phone and self.phone.strip():  # Validate format if provided
+            if not self._is_valid_phone(self.phone):
+                errors.append("Invalid phone format")
+        
+        # Ensure at least email OR phone is provided for messaging
+        if "email" not in required_fields and "phone" not in required_fields:
+            has_email = self.email and self.email.strip()
+            has_phone = self.phone and self.phone.strip()
+            if not has_email and not has_phone:
+                errors.append("Either email or phone is required for messaging")
         
         if errors:
             raise ValidationError(f"Customer validation failed: {'; '.join(errors)}")

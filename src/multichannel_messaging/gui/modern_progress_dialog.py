@@ -88,7 +88,8 @@ class ModernProgressDialog(QDialog):
         header_layout = QVBoxLayout(header_frame)
         
         # Operation name
-        self.operation_name_label = QLabel(self.operation.name)
+        operation_name = self.operation.name if self.operation.name is not None else "Unknown Operation"
+        self.operation_name_label = QLabel(str(operation_name))
         font = QFont()
         font.setPointSize(14)
         font.setBold(True)
@@ -100,7 +101,8 @@ class ModernProgressDialog(QDialog):
         
         # Type
         details_layout.addWidget(QLabel(self.i18n.tr("operation_type") + ":"), 0, 0)
-        self.type_label = QLabel(self.operation.operation_type.value.replace("_", " ").title())
+        operation_type = getattr(self.operation.operation_type, 'value', 'unknown') if self.operation.operation_type else 'unknown'
+        self.type_label = QLabel(str(operation_type).replace("_", " ").title())
         details_layout.addWidget(self.type_label, 0, 1)
         
         # Status
@@ -388,7 +390,8 @@ class ModernProgressDialog(QDialog):
         layout.addWidget(status_label)
         
         # Step name
-        name_label = QLabel(step.name)
+        step_name = step.name if step.name is not None else "Unknown Step"
+        name_label = QLabel(str(step_name))
         layout.addWidget(name_label)
         
         layout.addStretch()

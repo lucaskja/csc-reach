@@ -46,6 +46,8 @@ class TemplatePreviewWidget(QWidget):
             phone="+1-555-0123",
             email="john.smith@acme.com"
         )
+        # Validate with all fields for sample data
+        self.sample_customer.validate(["name", "company", "phone", "email"])
     
     def setup_ui(self):
         layout = QVBoxLayout(self)

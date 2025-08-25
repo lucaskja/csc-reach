@@ -1302,7 +1302,15 @@ CSC-Reach Team""",
                         email=customer_data["email"],
                         phone=customer_data["phone"],
                     )
-
+                    
+                    # Validate with flexible requirements based on selected channels
+                    required_fields = ["name"]  # Name is always required
+                    if "email" in configuration.messaging_channels:
+                        required_fields.append("email")
+                    if "whatsapp" in configuration.messaging_channels:
+                        required_fields.append("phone")
+                    
+                    customer.validate(required_fields)
                     customers.append(customer)
 
                 except Exception as e:
@@ -1360,7 +1368,7 @@ CSC-Reach Team""",
                 tr(
                     "imported_customers",
                     count=len(customers),
-                    filename=configuration.template_name or "CSV",
+                    filename=configuration.preset_name or "CSV",
                 )
             )
 

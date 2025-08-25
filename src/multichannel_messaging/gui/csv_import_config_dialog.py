@@ -34,12 +34,21 @@ logger = get_logger(__name__)
 class CSVImportConfiguration:
     """Configuration for CSV import with flexible column mapping."""
     
-    # Template information
-    template_name: str
+    # Preset information (optional)
+    preset_name: str = ""
     description: str = ""
     
+    @property
+    def template_name(self) -> str:
+        """Backward compatibility property for template_name."""
+        return self.preset_name
+    
+    @template_name.setter
+    def template_name(self, value: str):
+        """Backward compatibility setter for template_name."""
+        self.preset_name = value
+    
     # Column mapping configuration
-    required_columns: List[str] = field(default_factory=list)  # ['name', 'email', 'phone', 'company']
     column_mapping: Dict[str, str] = field(default_factory=dict)  # CSV column -> field mapping
     custom_fields: Dict[str, str] = field(default_factory=dict)  # Custom field definitions
     
@@ -64,23 +73,26 @@ class CSVImportConfiguration:
         """Validate the import configuration."""
         errors = []
         
-        # Check required columns based on messaging channels
-        required_fields = set()
-        if "email" in self.messaging_channels:
-            required_fields.update(["name", "email"])
-        if "whatsapp" in self.messaging_channels:
-            required_fields.update(["name", "phone"])
-        
-        # Check if all required fields are mapped
+        # Get mapped fields
         mapped_fields = set(self.column_mapping.values())
-        missing_fields = required_fields - mapped_fields
         
-        if missing_fields:
-            errors.append(ValidationError(f"Missing required fields for selected channels: {', '.join(missing_fields)}"))
+        # Name is always required
+        if "name" not in mapped_fields:
+            errors.append(ValidationError("Name field is required"))
         
-        # Validate template name
-        if not self.template_name.strip():
-            errors.append(ValidationError("Template name is required"))
+        # Must have at least email OR phone for messaging
+        has_email = "email" in mapped_fields
+        has_phone = "phone" in mapped_fields
+        
+        if not has_email and not has_phone:
+            errors.append(ValidationError("Either email or phone field is required for messaging"))
+        
+        # Check channel-specific requirements
+        if "email" in self.messaging_channels and not has_email:
+            errors.append(ValidationError("Email field is required for email messaging"))
+        
+        if "whatsapp" in self.messaging_channels and not has_phone:
+            errors.append(ValidationError("Phone field is required for WhatsApp messaging"))
         
         return errors
     
@@ -102,9 +114,8 @@ class CSVImportConfiguration:
     def to_dict(self) -> Dict[str, Any]:
         """Convert configuration to dictionary for serialization."""
         return {
-            "template_name": self.template_name,
+            "preset_name": self.preset_name,
             "description": self.description,
-            "required_columns": self.required_columns,
             "column_mapping": self.column_mapping,
             "custom_fields": self.custom_fields,
             "encoding": self.encoding,
@@ -122,9 +133,8 @@ class CSVImportConfiguration:
     def from_dict(cls, data: Dict[str, Any]) -> "CSVImportConfiguration":
         """Create configuration from dictionary."""
         config = cls(
-            template_name=data.get("template_name", ""),
+            preset_name=data.get("preset_name", data.get("template_name", "")),  # Backward compatibility
             description=data.get("description", ""),
-            required_columns=data.get("required_columns", []),
             column_mapping=data.get("column_mapping", {}),
             custom_fields=data.get("custom_fields", {}),
             encoding=data.get("encoding", "utf-8"),
@@ -200,7 +210,7 @@ class CSVImportConfigDialog(QDialog):
     def __init__(self, parent=None, file_path: Optional[str] = None):
         super().__init__(parent)
         self.file_path = file_path
-        self.configuration = CSVImportConfiguration(template_name="")
+        self.configuration = CSVImportConfiguration()
         self.file_structure: Optional[FileStructure] = None
         self.preview_data: Optional[pd.DataFrame] = None
         self.processed_data: Optional[pd.DataFrame] = None
@@ -208,12 +218,12 @@ class CSVImportConfigDialog(QDialog):
         # Initialize i18n
         self.i18n = get_i18n_manager()
         
-        # Template management
-        self.templates_dir = Path.home() / ".csc-reach" / "csv_templates"
-        self.templates_dir.mkdir(parents=True, exist_ok=True)
+        # Preset management (renamed from templates)
+        self.presets_dir = Path.home() / ".csc-reach" / "csv_presets"
+        self.presets_dir.mkdir(parents=True, exist_ok=True)
         
         self.setup_ui()
-        self.load_available_templates()
+        self.load_available_presets()
         
         # Load file if provided
         if self.file_path:
@@ -236,18 +246,18 @@ class CSVImportConfigDialog(QDialog):
         self.create_file_tab()
         self.create_columns_tab()
         self.create_preview_tab()
-        self.create_templates_tab()
+        self.create_presets_tab()
         
         # Button layout
         button_layout = QHBoxLayout()
         
-        self.load_template_btn = QPushButton(self.i18n.tr("load_template"))
-        self.load_template_btn.clicked.connect(self.load_template)
-        button_layout.addWidget(self.load_template_btn)
+        self.load_preset_btn = QPushButton(self.i18n.tr("load_preset"))
+        self.load_preset_btn.clicked.connect(self.load_preset)
+        button_layout.addWidget(self.load_preset_btn)
         
-        self.save_template_btn = QPushButton(self.i18n.tr("save_as_template"))
-        self.save_template_btn.clicked.connect(self.save_as_template)
-        button_layout.addWidget(self.save_template_btn)
+        self.save_preset_btn = QPushButton(self.i18n.tr("save_as_preset"))
+        self.save_preset_btn.clicked.connect(self.save_as_preset)
+        button_layout.addWidget(self.save_preset_btn)
         
         button_layout.addStretch()
         
@@ -319,7 +329,7 @@ class CSVImportConfigDialog(QDialog):
         channel_group = QGroupBox(self.i18n.tr("messaging_channels"))
         channel_layout = QVBoxLayout(channel_group)
         
-        channel_info = QLabel(self.i18n.tr("select_channels_info"))
+        channel_info = QLabel(self.i18n.tr("csv_channel_requirements_info"))
         channel_info.setWordWrap(True)
         channel_layout.addWidget(channel_info)
         
@@ -344,7 +354,7 @@ class CSVImportConfigDialog(QDialog):
         layout = QVBoxLayout(tab)
         
         # Instructions
-        instructions = QLabel(self.i18n.tr("column_mapping_instructions"))
+        instructions = QLabel(self.i18n.tr("csv_column_mapping_instructions"))
         instructions.setWordWrap(True)
         layout.addWidget(instructions)
         
@@ -410,35 +420,42 @@ class CSVImportConfigDialog(QDialog):
         
         self.tab_widget.addTab(tab, self.i18n.tr("preview_validation"))
     
-    def create_templates_tab(self):
-        """Create the template management tab."""
+    def create_presets_tab(self):
+        """Create the preset management tab."""
         tab = QWidget()
         layout = QVBoxLayout(tab)
         
-        # Template info
-        template_group = QGroupBox(self.i18n.tr("template_information"))
-        template_layout = QGridLayout(template_group)
+        # Info about presets
+        info_label = QLabel(self.i18n.tr("csv_presets_info"))
+        info_label.setWordWrap(True)
+        layout.addWidget(info_label)
         
-        template_layout.addWidget(QLabel(self.i18n.tr("template_name")), 0, 0)
-        self.template_name_edit = QLineEdit()
-        self.template_name_edit.textChanged.connect(self.on_template_info_changed)
-        template_layout.addWidget(self.template_name_edit, 0, 1)
+        # Preset info (optional)
+        preset_group = QGroupBox(self.i18n.tr("preset_information_optional"))
+        preset_layout = QGridLayout(preset_group)
         
-        template_layout.addWidget(QLabel(self.i18n.tr("description")), 1, 0)
+        preset_layout.addWidget(QLabel(self.i18n.tr("preset_name")), 0, 0)
+        self.preset_name_edit = QLineEdit()
+        self.preset_name_edit.setPlaceholderText(self.i18n.tr("preset_name_placeholder"))
+        self.preset_name_edit.textChanged.connect(self.on_preset_info_changed)
+        preset_layout.addWidget(self.preset_name_edit, 0, 1)
+        
+        preset_layout.addWidget(QLabel(self.i18n.tr("description")), 1, 0)
         self.description_edit = QTextEdit()
         self.description_edit.setMaximumHeight(80)
-        self.description_edit.textChanged.connect(self.on_template_info_changed)
-        template_layout.addWidget(self.description_edit, 1, 1)
+        self.description_edit.setPlaceholderText(self.i18n.tr("preset_description_placeholder"))
+        self.description_edit.textChanged.connect(self.on_preset_info_changed)
+        preset_layout.addWidget(self.description_edit, 1, 1)
         
-        layout.addWidget(template_group)
+        layout.addWidget(preset_group)
         
-        # Available templates
-        available_group = QGroupBox(self.i18n.tr("available_templates"))
+        # Available presets
+        available_group = QGroupBox(self.i18n.tr("available_presets"))
         available_layout = QVBoxLayout(available_group)
         
-        self.templates_table = QTableWidget()
-        self.templates_table.setColumnCount(4)
-        self.templates_table.setHorizontalHeaderLabels([
+        self.presets_table = QTableWidget()
+        self.presets_table.setColumnCount(4)
+        self.presets_table.setHorizontalHeaderLabels([
             self.i18n.tr("name"),
             self.i18n.tr("description"),
             self.i18n.tr("last_used"),
@@ -446,30 +463,30 @@ class CSVImportConfigDialog(QDialog):
         ])
         
         # Set column widths
-        header = self.templates_table.horizontalHeader()
+        header = self.presets_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         
-        self.templates_table.itemSelectionChanged.connect(self.on_template_selected)
-        available_layout.addWidget(self.templates_table)
+        self.presets_table.itemSelectionChanged.connect(self.on_preset_selected)
+        available_layout.addWidget(self.presets_table)
         
-        # Template management buttons
-        template_buttons = QHBoxLayout()
+        # Preset management buttons
+        preset_buttons = QHBoxLayout()
         
-        self.delete_template_btn = QPushButton(self.i18n.tr("delete_template"))
-        self.delete_template_btn.clicked.connect(self.delete_template)
-        self.delete_template_btn.setEnabled(False)
-        template_buttons.addWidget(self.delete_template_btn)
+        self.delete_preset_btn = QPushButton(self.i18n.tr("delete_preset"))
+        self.delete_preset_btn.clicked.connect(self.delete_preset)
+        self.delete_preset_btn.setEnabled(False)
+        preset_buttons.addWidget(self.delete_preset_btn)
         
-        template_buttons.addStretch()
+        preset_buttons.addStretch()
         
-        available_layout.addLayout(template_buttons)
+        available_layout.addLayout(preset_buttons)
         
         layout.addWidget(available_group)
         
-        self.tab_widget.addTab(tab, self.i18n.tr("templates"))    
+        self.tab_widget.addTab(tab, self.i18n.tr("presets"))    
 
     def browse_file(self):
         """Browse for CSV file."""
@@ -609,19 +626,21 @@ class CSVImportConfigDialog(QDialog):
     
     def update_required_indicators(self):
         """Update required field indicators in the table."""
-        # Get required fields based on selected channels
-        required_fields = set()
-        if self.email_check.isChecked():
-            required_fields.update(["name", "email"])
-        if self.whatsapp_check.isChecked():
-            required_fields.update(["name", "phone"])
-        
         # Get current mappings
-        current_mappings = {}
+        current_mappings = set()
         for i in range(self.column_table.rowCount()):
             combo = self.column_table.cellWidget(i, 1)
             if combo and combo.currentText():
-                current_mappings[combo.currentText()] = True
+                current_mappings.add(combo.currentText())
+        
+        # Name is always required
+        required_fields = {"name"}
+        
+        # Add channel-specific requirements
+        if self.email_check.isChecked():
+            required_fields.add("email")
+        if self.whatsapp_check.isChecked():
+            required_fields.add("phone")
         
         # Update required indicators
         for i in range(self.column_table.rowCount()):
@@ -642,19 +661,25 @@ class CSVImportConfigDialog(QDialog):
     
     def update_required_fields_info(self):
         """Update the required fields information label."""
-        required_fields = set()
-        if self.email_check.isChecked():
-            required_fields.update(["name", "email"])
-        if self.whatsapp_check.isChecked():
-            required_fields.update(["name", "phone"])
+        # Name is always required
+        required_fields = {"name"}
         
-        if required_fields:
+        # Add channel-specific requirements
+        if self.email_check.isChecked():
+            required_fields.add("email")
+        if self.whatsapp_check.isChecked():
+            required_fields.add("phone")
+        
+        # Check if we have at least email OR phone for basic messaging
+        has_email_or_phone = self.email_check.isChecked() or self.whatsapp_check.isChecked()
+        
+        if has_email_or_phone:
             fields_text = ", ".join(sorted(required_fields))
             self.required_fields_label.setText(
-                self.i18n.tr("required_fields_for_channels", fields=fields_text)
+                self.i18n.tr("csv_required_fields_info", fields=fields_text)
             )
         else:
-            self.required_fields_label.setText(self.i18n.tr("no_channels_selected"))
+            self.required_fields_label.setText(self.i18n.tr("csv_no_channels_selected"))
     
     def on_format_changed(self):
         """Handle file format settings change."""
@@ -667,14 +692,16 @@ class CSVImportConfigDialog(QDialog):
         self.update_required_indicators()
         self.update_configuration_from_ui()
     
-    def on_template_info_changed(self):
-        """Handle template information change."""
+    def on_preset_info_changed(self):
+        """Handle preset information change."""
         self.update_configuration_from_ui()
     
     def update_configuration_from_ui(self):
         """Update configuration object from UI values."""
-        self.configuration.template_name = self.template_name_edit.text().strip()
-        self.configuration.description = self.description_edit.toPlainText().strip()
+        if hasattr(self, 'preset_name_edit'):
+            self.configuration.preset_name = self.preset_name_edit.text().strip()
+        if hasattr(self, 'description_edit'):
+            self.configuration.description = self.description_edit.toPlainText().strip()
         self.configuration.encoding = self.encoding_combo.currentText()
         self.configuration.delimiter = self.delimiter_combo.currentText()
         self.configuration.has_header = self.has_header_check.isChecked()
@@ -757,76 +784,76 @@ class CSVImportConfigDialog(QDialog):
             self.validation_text.setPlainText(f"Preview error: {str(e)}")
             self.validation_text.setStyleSheet("color: red;")
     
-    def load_available_templates(self):
-        """Load available configuration templates."""
-        self.templates_table.setRowCount(0)
+    def load_available_presets(self):
+        """Load available configuration presets."""
+        self.presets_table.setRowCount(0)
         
         try:
-            template_files = list(self.templates_dir.glob("*.json"))
-            self.templates_table.setRowCount(len(template_files))
+            preset_files = list(self.presets_dir.glob("*.json"))
+            self.presets_table.setRowCount(len(preset_files))
             
-            for i, template_file in enumerate(template_files):
+            for i, preset_file in enumerate(preset_files):
                 try:
-                    with open(template_file, 'r', encoding='utf-8') as f:
-                        template_data = json.load(f)
+                    with open(preset_file, 'r', encoding='utf-8') as f:
+                        preset_data = json.load(f)
                     
-                    config = CSVImportConfiguration.from_dict(template_data)
+                    config = CSVImportConfiguration.from_dict(preset_data)
                     
                     # Name
-                    name_item = QTableWidgetItem(config.template_name)
+                    name_item = QTableWidgetItem(config.preset_name)
                     name_item.setFlags(name_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                    self.templates_table.setItem(i, 0, name_item)
+                    self.presets_table.setItem(i, 0, name_item)
                     
                     # Description
                     desc_item = QTableWidgetItem(config.description)
                     desc_item.setFlags(desc_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                    self.templates_table.setItem(i, 1, desc_item)
+                    self.presets_table.setItem(i, 1, desc_item)
                     
                     # Last used
                     last_used_item = QTableWidgetItem(config.last_used.strftime("%Y-%m-%d %H:%M"))
                     last_used_item.setFlags(last_used_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                    self.templates_table.setItem(i, 2, last_used_item)
+                    self.presets_table.setItem(i, 2, last_used_item)
                     
                     # Usage count
                     usage_item = QTableWidgetItem(str(config.usage_count))
                     usage_item.setFlags(usage_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                    self.templates_table.setItem(i, 3, usage_item)
+                    self.presets_table.setItem(i, 3, usage_item)
                     
                 except Exception as e:
-                    logger.warning(f"Failed to load template {template_file}: {e}")
+                    logger.warning(f"Failed to load preset {preset_file}: {e}")
                     
         except Exception as e:
-            logger.error(f"Failed to load templates: {e}")
+            logger.error(f"Failed to load presets: {e}")
     
-    def on_template_selected(self):
-        """Handle template selection."""
-        selected_items = self.templates_table.selectedItems()
-        self.delete_template_btn.setEnabled(len(selected_items) > 0)
+    def on_preset_selected(self):
+        """Handle preset selection."""
+        selected_items = self.presets_table.selectedItems()
+        self.delete_preset_btn.setEnabled(len(selected_items) > 0)
     
-    def load_template(self):
-        """Load selected template."""
-        current_row = self.templates_table.currentRow()
+    def load_preset(self):
+        """Load selected preset."""
+        current_row = self.presets_table.currentRow()
         if current_row < 0:
-            QMessageBox.information(self, self.i18n.tr("info"), self.i18n.tr("select_template_to_load"))
+            QMessageBox.information(self, self.i18n.tr("info"), self.i18n.tr("select_preset_to_load"))
             return
         
         try:
-            name_item = self.templates_table.item(current_row, 0)
+            name_item = self.presets_table.item(current_row, 0)
             if not name_item:
                 return
             
-            template_name = name_item.text()
-            template_file = self.templates_dir / f"{template_name}.json"
+            preset_name = name_item.text()
+            preset_file = self.presets_dir / f"{preset_name}.json"
             
-            if not template_file.exists():
-                QMessageBox.warning(self, self.i18n.tr("warning"), self.i18n.tr("template_file_not_found"))
+            if not preset_file.exists():
+                QMessageBox.warning(self, self.i18n.tr("warning"), self.i18n.tr("preset_file_not_found"))
                 return
             
-            with open(template_file, 'r', encoding='utf-8') as f:
-                template_data = json.load(f)
+            with open(preset_file, 'r', encoding='utf-8') as f:
+                preset_data = json.load(f)
             
             # Load configuration
-            self.configuration = CSVImportConfiguration.from_dict(template_data)
+            self.configuration = CSVImportConfiguration.from_dict(preset_data)
             
             # Update usage count and last used
             self.configuration.usage_count += 1
@@ -835,21 +862,21 @@ class CSVImportConfigDialog(QDialog):
             # Update UI
             self.update_ui_from_configuration()
             
-            # Save updated template
-            self.save_template_to_file(template_file)
+            # Save updated preset
+            self.save_preset_to_file(preset_file)
             
-            # Refresh templates list
-            self.load_available_templates()
+            # Refresh presets list
+            self.load_available_presets()
             
-            QMessageBox.information(self, self.i18n.tr("success"), self.i18n.tr("template_loaded_successfully"))
+            QMessageBox.information(self, self.i18n.tr("success"), self.i18n.tr("preset_loaded_successfully"))
             
         except Exception as e:
-            logger.error(f"Failed to load template: {e}")
+            logger.error(f"Failed to load preset: {e}")
             QMessageBox.critical(self, self.i18n.tr("error"), str(e))
     
     def update_ui_from_configuration(self):
         """Update UI controls from configuration object."""
-        self.template_name_edit.setText(self.configuration.template_name)
+        self.preset_name_edit.setText(self.configuration.preset_name)
         self.description_edit.setPlainText(self.configuration.description)
         self.encoding_combo.setCurrentText(self.configuration.encoding)
         self.delimiter_combo.setCurrentText(self.configuration.delimiter)
@@ -874,79 +901,79 @@ class CSVImportConfigDialog(QDialog):
         
         self.update_required_indicators()
     
-    def save_as_template(self):
-        """Save current configuration as template."""
+    def save_as_preset(self):
+        """Save current configuration as preset."""
         self.update_configuration_from_ui()
         
-        if not self.configuration.template_name.strip():
-            QMessageBox.warning(self, self.i18n.tr("warning"), self.i18n.tr("template_name_required"))
+        if not self.configuration.preset_name.strip():
+            QMessageBox.warning(self, self.i18n.tr("warning"), self.i18n.tr("preset_name_required"))
             return
         
         try:
-            template_file = self.templates_dir / f"{self.configuration.template_name}.json"
+            preset_file = self.presets_dir / f"{self.configuration.preset_name}.json"
             
-            # Check if template already exists
-            if template_file.exists():
+            # Check if preset already exists
+            if preset_file.exists():
                 reply = QMessageBox.question(
                     self,
                     self.i18n.tr("confirm"),
-                    self.i18n.tr("template_exists_overwrite"),
+                    self.i18n.tr("preset_exists_overwrite"),
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
                 )
                 if reply != QMessageBox.StandardButton.Yes:
                     return
             
-            # Save template
-            self.save_template_to_file(template_file)
+            # Save preset
+            self.save_preset_to_file(preset_file)
             
-            # Refresh templates list
-            self.load_available_templates()
+            # Refresh presets list
+            self.load_available_presets()
             
-            QMessageBox.information(self, self.i18n.tr("success"), self.i18n.tr("template_saved_successfully"))
+            QMessageBox.information(self, self.i18n.tr("success"), self.i18n.tr("preset_saved_successfully"))
             
         except Exception as e:
-            logger.error(f"Failed to save template: {e}")
+            logger.error(f"Failed to save preset: {e}")
             QMessageBox.critical(self, self.i18n.tr("error"), str(e))
     
-    def save_template_to_file(self, file_path: Path):
-        """Save configuration to template file."""
-        template_data = self.configuration.to_dict()
+    def save_preset_to_file(self, file_path: Path):
+        """Save configuration to preset file."""
+        preset_data = self.configuration.to_dict()
         
         with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump(template_data, f, indent=2, ensure_ascii=False)
+            json.dump(preset_data, f, indent=2, ensure_ascii=False)
     
-    def delete_template(self):
-        """Delete selected template."""
-        current_row = self.templates_table.currentRow()
+    def delete_preset(self):
+        """Delete selected preset."""
+        current_row = self.presets_table.currentRow()
         if current_row < 0:
             return
         
         try:
-            name_item = self.templates_table.item(current_row, 0)
+            name_item = self.presets_table.item(current_row, 0)
             if not name_item:
                 return
             
-            template_name = name_item.text()
+            preset_name = name_item.text()
             
             reply = QMessageBox.question(
                 self,
                 self.i18n.tr("confirm"),
-                self.i18n.tr("confirm_delete_template", name=template_name),
+                self.i18n.tr("confirm_delete_preset", name=preset_name),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
             )
             
             if reply == QMessageBox.StandardButton.Yes:
-                template_file = self.templates_dir / f"{template_name}.json"
-                if template_file.exists():
-                    template_file.unlink()
+                preset_file = self.presets_dir / f"{preset_name}.json"
+                if preset_file.exists():
+                    preset_file.unlink()
                 
-                # Refresh templates list
-                self.load_available_templates()
+                # Refresh presets list
+                self.load_available_presets()
                 
-                QMessageBox.information(self, self.i18n.tr("success"), self.i18n.tr("template_deleted_successfully"))
+                QMessageBox.information(self, self.i18n.tr("success"), self.i18n.tr("preset_deleted_successfully"))
                 
         except Exception as e:
-            logger.error(f"Failed to delete template: {e}")
+            logger.error(f"Failed to delete preset: {e}")
             QMessageBox.critical(self, self.i18n.tr("error"), str(e))
     
     def import_data(self):
