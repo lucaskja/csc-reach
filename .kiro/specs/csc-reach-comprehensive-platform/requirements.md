@@ -210,3 +210,33 @@ CSC-Reach is a comprehensive multi-channel communication platform designed for b
 6. WHEN compatibility tests are performed THEN the system SHALL verify cross-platform functionality
 7. WHEN regression tests are executed THEN the system SHALL prevent introduction of new bugs
 8. WHEN automated testing is implemented THEN the system SHALL support continuous integration workflows
+
+### Requirement 16: Enhanced CSV Import Configuration
+
+**User Story:** As a business user, I want to configure the CSV import format to match my specific data needs, so that I can import only the columns I need for my messaging campaigns.
+
+#### Acceptance Criteria
+
+1. WHEN importing a CSV file THEN the system SHALL present a format configuration dialog
+2. WHEN configuring CSV format THEN the system SHALL allow selection of required columns (name, email, phone, company)
+3. WHEN only email messaging is needed THEN the system SHALL allow importing only name and email columns
+4. WHEN only WhatsApp messaging is needed THEN the system SHALL allow importing only name and phone columns
+5. WHEN custom field mapping is needed THEN the system SHALL allow mapping CSV columns to custom fields
+6. WHEN CSV format is configured THEN the system SHALL save the configuration as a template for reuse
+7. WHEN importing with saved templates THEN the system SHALL apply the template automatically
+8. WHEN column validation occurs THEN the system SHALL validate only the selected required columns
+
+### Requirement 17: WhatsApp Multi-Message Template Support
+
+**User Story:** As a business user, I want to send WhatsApp messages as separate individual messages instead of one long message, so that I can create more engaging and readable conversations.
+
+#### Acceptance Criteria
+
+1. WHEN creating WhatsApp templates THEN the system SHALL support multi-message format configuration
+2. WHEN template content contains line breaks THEN the system SHALL offer option to split into separate messages
+3. WHEN multi-message mode is enabled THEN the system SHALL send each paragraph as a separate WhatsApp message
+4. WHEN sending multi-message templates THEN the system SHALL maintain proper message order and timing
+5. WHEN previewing multi-message templates THEN the system SHALL show each message separately in preview
+6. WHEN rate limiting applies THEN the system SHALL respect WhatsApp rate limits between individual messages
+7. WHEN message delivery fails THEN the system SHALL track which specific message in the sequence failed
+8. WHEN configuring templates THEN the system SHALL allow users to toggle between single and multi-message modes

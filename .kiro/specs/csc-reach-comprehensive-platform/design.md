@@ -200,6 +200,104 @@ class AWSEndUserMessagingService:
 
 ### Data Models
 
+#### Enhanced CSV Import Configuration
+
+```python
+@dataclass
+class CSVImportConfiguration:
+    """Configuration for CSV import with flexible column mapping."""
+    
+    # Template information
+    template_name: str
+    description: str = ""
+    
+    # Column mapping configuration
+    required_columns: List[str] = field(default_factory=list)  # ['name', 'email', 'phone', 'company']
+    column_mapping: Dict[str, str] = field(default_factory=dict)  # CSV column -> field mapping
+    custom_fields: Dict[str, str] = field(default_factory=dict)  # Custom field definitions
+    
+    # Import settings
+    encoding: str = "utf-8"
+    delimiter: str = ","
+    has_header: bool = True
+    skip_rows: int = 0
+    
+    # Validation rules
+    validation_rules: Dict[str, Any] = field(default_factory=dict)
+    
+    # Metadata
+    created_at: datetime = field(default_factory=datetime.now)
+    last_used: datetime = field(default_factory=datetime.now)
+    usage_count: int = 0
+    
+    def validate_configuration(self) -> List[ValidationError]
+    def apply_to_csv(self, csv_data: pd.DataFrame) -> pd.DataFrame
+    def save_as_template(self) -> bool
+    
+    @classmethod
+    def load_template(cls, template_name: str) -> "CSVImportConfiguration"
+
+class CSVImportDialog:
+    """Enhanced CSV import dialog with configuration options."""
+    
+    def __init__(self, parent=None):
+        self.parent = parent
+        self.configuration = CSVImportConfiguration()
+        self.preview_data = None
+        
+    def show_format_configuration(self) -> CSVImportConfiguration
+    def preview_import_data(self, file_path: str) -> pd.DataFrame
+    def validate_selected_columns(self) -> List[ValidationError]
+    def save_configuration_template(self) -> bool
+    def load_configuration_template(self, template_name: str) -> bool
+```
+
+#### WhatsApp Multi-Message Template System
+
+```python
+@dataclass
+class WhatsAppMessageTemplate:
+    """Enhanced WhatsApp template with multi-message support."""
+    
+    # Basic template information
+    id: str
+    name: str
+    content: str
+    
+    # Multi-message configuration
+    multi_message_mode: bool = False
+    message_split_strategy: str = "paragraph"  # "paragraph", "sentence", "custom"
+    custom_split_delimiter: str = "\n\n"
+    message_delay_seconds: float = 1.0
+    
+    # Message sequence
+    message_sequence: List[str] = field(default_factory=list)
+    
+    def split_into_messages(self) -> List[str]
+    def preview_message_sequence(self, customer_data: Dict[str, str]) -> List[str]
+    def convert_to_single_message(self) -> str
+    def convert_to_multi_message(self) -> List[str]
+    def validate_message_sequence(self) -> List[ValidationError]
+
+class WhatsAppMultiMessageService:
+    """Service for handling multi-message WhatsApp sending."""
+    
+    def __init__(self, whatsapp_service: WhatsAppService):
+        self.whatsapp_service = whatsapp_service
+        self.rate_limiter = WhatsAppRateLimiter()
+        
+    def send_multi_message_sequence(
+        self,
+        phone_number: str,
+        message_sequence: List[str],
+        delay_between_messages: float = 1.0
+    ) -> List[MessageRecord]
+    
+    def track_sequence_delivery(self, sequence_id: str) -> SequenceDeliveryStatus
+    def cancel_pending_messages(self, sequence_id: str) -> bool
+    def retry_failed_messages(self, sequence_id: str) -> List[MessageRecord]
+```
+
 #### Enhanced Customer Model
 
 ```python
@@ -282,6 +380,72 @@ class MessageTemplate:
 ### Architecture Overview
 
 The AWS End User Messaging integration provides a cloud-native, scalable alternative to direct WhatsApp Business API integration. This design leverages AWS's managed services for enhanced reliability, security, and compliance.
+
+### Enhanced User Experience Features
+
+#### 1. Flexible CSV Import System
+
+The enhanced CSV import system provides users with complete control over data import, allowing them to configure exactly which columns they need based on their messaging requirements.
+
+**Key Features:**
+- **Column Selection Interface**: Users can select only the columns they need (name, email, phone, company)
+- **Template System**: Save and reuse import configurations for different data sources
+- **Validation Engine**: Validate only selected columns based on messaging channel requirements
+- **Preview System**: Show exactly what data will be imported before processing
+
+**Architecture:**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    CSV Import Configuration                     │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │           Configuration Dialog                              │ │
+│  │  • Column Selection Interface                               │ │
+│  │  • Template Management                                      │ │
+│  │  • Preview and Validation                                   │ │
+│  │  • Custom Field Mapping                                     │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │           Processing Engine                                 │ │
+│  │  • Selective Column Processing                              │ │
+│  │  • Validation Based on Requirements                        │ │
+│  │  • Template Application                                     │ │
+│  │  • Data Transformation                                      │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 2. WhatsApp Multi-Message System
+
+The multi-message system transforms long WhatsApp messages into engaging conversation sequences, improving readability and user engagement.
+
+**Key Features:**
+- **Message Splitting**: Automatically split content based on paragraphs or custom delimiters
+- **Sequence Management**: Maintain proper order and timing between messages
+- **Rate Limiting**: Respect WhatsApp rate limits between individual messages
+- **Delivery Tracking**: Track delivery status for each message in the sequence
+
+**Architecture:**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                WhatsApp Multi-Message System                    │
+├─────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │           Template Configuration                            │ │
+│  │  • Multi-Message Mode Toggle                               │ │
+│  │  • Split Strategy Selection                                │ │
+│  │  • Timing Configuration                                     │ │
+│  │  • Preview Generation                                       │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │           Message Processing                                │ │
+│  │  • Content Splitting Logic                                 │ │
+│  │  • Sequence Generation                                      │ │
+│  │  • Rate-Limited Delivery                                    │ │
+│  │  • Delivery Status Tracking                                │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ### Key AWS Services Integration
 
