@@ -54,6 +54,7 @@ from .template_library_dialog import TemplateLibraryDialog
 from .whatsapp_multi_message_dialog import WhatsAppMultiMessageDialog
 from .modern_progress_dialog import ModernProgressDialog
 from .preferences_dialog import PreferencesDialog
+from .variables_panel import VariablesPanel
 from ..gui.whatsapp_settings_dialog import WhatsAppSettingsDialog
 from ..gui.whatsapp_web_settings_dialog import WhatsAppWebSettingsDialog
 from ..gui.language_settings_dialog import LanguageSettingsDialog
@@ -325,6 +326,9 @@ class MainWindow(QMainWindow):
         # Current operation tracking
         self.current_operation_id: Optional[str] = None
         self.progress_dialog: Optional[ModernProgressDialog] = None
+        
+        # Variables panel
+        self.variables_panel: Optional[VariablesPanel] = None
 
         self.setup_ui()
         self.setup_services()
@@ -586,12 +590,17 @@ class MainWindow(QMainWindow):
         left_panel = self.create_recipients_panel()
         splitter.addWidget(left_panel)
 
+        # Middle panel - Variables
+        self.variables_panel = VariablesPanel()
+        self.variables_panel.variable_selected.connect(self.on_variable_selected)
+        splitter.addWidget(self.variables_panel)
+
         # Right panel - Template and Status
         right_panel = self.create_right_panel()
         splitter.addWidget(right_panel)
 
-        # Set splitter proportions
-        splitter.setSizes([400, 600])
+        # Set splitter proportions (Recipients: Variables: Template)
+        splitter.setSizes([350, 250, 600])
 
         parent_layout.addWidget(splitter)
 
@@ -1327,6 +1336,22 @@ CSC-Reach Team""",
             self.update_recipients_list()
             self.update_send_button_state()
 
+            # Update variables panel with CSV columns
+            if self.variables_panel and processed_data is not None:
+                # Get column names from the processed data
+                csv_columns = list(processed_data.columns)
+                # Get sample data from first row
+                sample_data = {}
+                if not processed_data.empty:
+                    first_row = processed_data.iloc[0]
+                    sample_data = {col: str(first_row[col]) for col in csv_columns}
+                
+                # Update variables
+                self.variables_panel.get_variable_manager().update_available_variables(
+                    csv_columns, sample_data
+                )
+                logger.info(f"Updated variables panel with CSV columns: {csv_columns}")
+
             # Update status
             self.status_bar.showMessage(
                 tr("loaded_customers", count=len(customers)), 3000
@@ -1693,6 +1718,35 @@ CSC-Reach streamlines business communication processes with professional email t
             self.whatsapp_status_label.setStyleSheet("color: green;")
         else:
             self.whatsapp_status_label.setText("WhatsApp Business: Not configured")
+
+    def on_variable_selected(self, variable_format: str):
+        """Handle variable selection from the variables panel."""
+        # Get the currently focused text editor
+        focused_widget = QApplication.focusWidget()
+        
+        # Check if it's one of our text editors
+        if focused_widget == self.subject_edit:
+            cursor = self.subject_edit.textCursor()
+            cursor.insertText(variable_format)
+            logger.info(f"Inserted variable {variable_format} into subject")
+        elif focused_widget == self.content_edit:
+            cursor = self.content_edit.textCursor()
+            cursor.insertText(variable_format)
+            logger.info(f"Inserted variable {variable_format} into email content")
+        elif focused_widget == self.whatsapp_content_edit:
+            cursor = self.whatsapp_content_edit.textCursor()
+            cursor.insertText(variable_format)
+            logger.info(f"Inserted variable {variable_format} into WhatsApp content")
+        else:
+            # Default to email content if no specific editor is focused
+            cursor = self.content_edit.textCursor()
+            cursor.insertText(variable_format)
+            self.content_edit.setFocus()
+            logger.info(f"Inserted variable {variable_format} into email content (default)")
+        
+        # Update character count for WhatsApp if needed
+        if focused_widget == self.whatsapp_content_edit:
+            self.update_whatsapp_char_count()
             self.whatsapp_status_label.setStyleSheet("color: orange;")
 
         # Update WhatsApp Web status

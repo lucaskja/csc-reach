@@ -240,3 +240,18 @@ CSC-Reach is a comprehensive multi-channel communication platform designed for b
 6. WHEN rate limiting applies THEN the system SHALL respect WhatsApp rate limits between individual messages
 7. WHEN message delivery fails THEN the system SHALL track which specific message in the sequence failed
 8. WHEN configuring templates THEN the system SHALL allow users to toggle between single and multi-message modes
+
+### Requirement 18: Dynamic Variable Management and Display
+
+**User Story:** As a business user, I want to see available template variables clearly displayed in the main window and have them automatically generated from my CSV column names, so that I can easily create personalized messages without guessing variable names.
+
+#### Acceptance Criteria
+
+1. WHEN CSV data is imported THEN the system SHALL automatically generate template variables based on CSV column names
+2. WHEN CSV columns are mapped THEN the system SHALL create variables using the actual column names from the CSV file
+3. WHEN the main window is displayed THEN the system SHALL show a visible list of available template variables
+4. WHEN template variables are available THEN the system SHALL display them in a dedicated panel or section of the main window
+5. WHEN creating templates THEN the system SHALL allow users to insert variables by clicking on them from the displayed list
+6. WHEN CSV data changes THEN the system SHALL automatically update the available variables list
+7. WHEN no CSV is loaded THEN the system SHALL display default variables (name, email, phone, company) as examples
+8. WHEN variables are displayed THEN the system SHALL show them in the format they should be used in templates (e.g., {column_name})

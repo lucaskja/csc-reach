@@ -298,6 +298,127 @@ class WhatsAppMultiMessageService:
     def retry_failed_messages(self, sequence_id: str) -> List[MessageRecord]
 ```
 
+#### Dynamic Variable Management System
+
+```python
+@dataclass
+class TemplateVariable:
+    """Represents a template variable with metadata."""
+    
+    name: str  # Original column name from CSV
+    variable_name: str  # Formatted variable name for templates (e.g., {column_name})
+    data_type: str  # "text", "email", "phone", "number"
+    sample_value: str = ""
+    description: str = ""
+    is_required: bool = False
+    
+    def format_for_template(self) -> str:
+        """Return the variable in template format."""
+        return f"{{{self.variable_name}}}"
+    
+    def validate_value(self, value: str) -> bool:
+        """Validate a value against this variable's data type."""
+        pass
+
+class DynamicVariableManager:
+    """Manages dynamic template variables based on CSV data."""
+    
+    def __init__(self):
+        self.available_variables: List[TemplateVariable] = []
+        self.default_variables: List[TemplateVariable] = self._create_default_variables()
+        
+    def generate_variables_from_csv(self, csv_columns: List[str], sample_data: Dict[str, str] = None) -> List[TemplateVariable]:
+        """Generate template variables from CSV column names."""
+        variables = []
+        for column in csv_columns:
+            variable = TemplateVariable(
+                name=column,
+                variable_name=self._format_variable_name(column),
+                data_type=self._detect_data_type(column, sample_data.get(column) if sample_data else None),
+                sample_value=sample_data.get(column, "") if sample_data else "",
+                description=f"Data from '{column}' column"
+            )
+            variables.append(variable)
+        return variables
+    
+    def update_available_variables(self, csv_columns: List[str], sample_data: Dict[str, str] = None):
+        """Update the list of available variables based on current CSV data."""
+        if csv_columns:
+            self.available_variables = self.generate_variables_from_csv(csv_columns, sample_data)
+        else:
+            self.available_variables = self.default_variables.copy()
+    
+    def get_available_variables(self) -> List[TemplateVariable]:
+        """Get the current list of available variables."""
+        return self.available_variables
+    
+    def get_variable_by_name(self, variable_name: str) -> Optional[TemplateVariable]:
+        """Get a specific variable by its name."""
+        for var in self.available_variables:
+            if var.variable_name == variable_name:
+                return var
+        return None
+    
+    def _format_variable_name(self, column_name: str) -> str:
+        """Format column name into a valid variable name."""
+        # Convert to lowercase, replace spaces and special chars with underscores
+        formatted = re.sub(r'[^a-zA-Z0-9_]', '_', column_name.lower())
+        # Remove multiple consecutive underscores
+        formatted = re.sub(r'_+', '_', formatted)
+        # Remove leading/trailing underscores
+        return formatted.strip('_')
+    
+    def _detect_data_type(self, column_name: str, sample_value: str = None) -> str:
+        """Detect the data type based on column name and sample value."""
+        column_lower = column_name.lower()
+        if 'email' in column_lower:
+            return 'email'
+        elif 'phone' in column_lower or 'tel' in column_lower:
+            return 'phone'
+        elif 'number' in column_lower or 'count' in column_lower:
+            return 'number'
+        else:
+            return 'text'
+    
+    def _create_default_variables(self) -> List[TemplateVariable]:
+        """Create default variables when no CSV is loaded."""
+        return [
+            TemplateVariable("Name", "name", "text", "John Doe", "Customer name", True),
+            TemplateVariable("Email", "email", "email", "john@example.com", "Customer email address"),
+            TemplateVariable("Phone", "phone", "phone", "+1234567890", "Customer phone number"),
+            TemplateVariable("Company", "company", "text", "Example Corp", "Customer company name"),
+        ]
+
+class VariablesPanel:
+    """GUI component for displaying and managing template variables."""
+    
+    def __init__(self, parent=None):
+        self.parent = parent
+        self.variable_manager = DynamicVariableManager()
+        self.variable_list_widget = None
+        self.search_box = None
+        
+    def setup_ui(self):
+        """Set up the variables panel UI."""
+        # Create main layout
+        # Add search box for filtering variables
+        # Create list widget for displaying variables
+        # Add click-to-insert functionality
+        pass
+    
+    def update_variables_display(self, variables: List[TemplateVariable]):
+        """Update the display with new variables."""
+        pass
+    
+    def on_variable_clicked(self, variable: TemplateVariable):
+        """Handle variable click to insert into template."""
+        # Emit signal with variable format for insertion
+        pass
+    
+    def filter_variables(self, search_text: str):
+        """Filter displayed variables based on search text."""
+        pass
+
 #### Enhanced Customer Model
 
 ```python
