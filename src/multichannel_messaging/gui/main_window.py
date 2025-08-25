@@ -38,6 +38,8 @@ from ..core.config_manager import ConfigManager
 from ..core.csv_processor import CSVProcessor
 from ..core.models import Customer, MessageTemplate, MessageChannel
 from ..core.template_manager import TemplateManager
+from ..core.whatsapp_multi_message_manager import WhatsAppMultiMessageManager
+from ..core.whatsapp_multi_message import WhatsAppMultiMessageService
 from ..core.theme_manager import ThemeManager, ThemeMode
 from ..core.progress_manager import ProgressManager, OperationType, ProgressTracker
 from ..core.user_preferences import UserPreferencesManager
@@ -49,6 +51,7 @@ from ..services.logged_email_service import LoggedEmailService
 from ..services.whatsapp_local_service import LocalWhatsAppBusinessService
 from ..services.whatsapp_web_service import WhatsAppWebService
 from .template_library_dialog import TemplateLibraryDialog
+from .whatsapp_multi_message_dialog import WhatsAppMultiMessageDialog
 from .modern_progress_dialog import ModernProgressDialog
 from .preferences_dialog import PreferencesDialog
 from ..gui.whatsapp_settings_dialog import WhatsAppSettingsDialog
@@ -296,6 +299,14 @@ class MainWindow(QMainWindow):
         self.template_manager = TemplateManager(
             self.config_manager
         )  # Template management system
+        
+        self.whatsapp_multi_message_manager = WhatsAppMultiMessageManager(
+            self.config_manager
+        )  # WhatsApp multi-message template manager
+        
+        self.whatsapp_multi_message_service = WhatsAppMultiMessageService(
+            self.whatsapp_service
+        )  # WhatsApp multi-message service
         self.customers: List[Customer] = []
         self.current_template: Optional[MessageTemplate] = None
         self.sending_thread: Optional[EmailSendingThread] = None
@@ -409,6 +420,19 @@ class MainWindow(QMainWindow):
         export_templates_action = QAction(tr("export_all_templates_menu"), self)
         export_templates_action.triggered.connect(self.export_all_templates)
         templates_menu.addAction(export_templates_action)
+        
+        templates_menu.addSeparator()
+        
+        # WhatsApp Multi-Message Templates
+        whatsapp_multi_menu = templates_menu.addMenu(tr("whatsapp_multi_message_templates"))
+        
+        create_whatsapp_template_action = QAction(tr("create_whatsapp_template"), self)
+        create_whatsapp_template_action.triggered.connect(self.create_whatsapp_multi_message_template)
+        whatsapp_multi_menu.addAction(create_whatsapp_template_action)
+        
+        manage_whatsapp_templates_action = QAction(tr("manage_whatsapp_templates"), self)
+        manage_whatsapp_templates_action.triggered.connect(self.manage_whatsapp_multi_message_templates)
+        whatsapp_multi_menu.addAction(manage_whatsapp_templates_action)
 
         # Tools menu
         tools_menu = menubar.addMenu(tr("menu_tools"))
@@ -997,6 +1021,193 @@ CSC-Reach Team""",
             else:
                 QMessageBox.critical(
                     self, tr("error"), tr("failed_to_export_templates")
+                )
+    
+    def create_whatsapp_multi_message_template(self):
+        """Create a new WhatsApp multi-message template."""
+        try:
+            dialog = WhatsAppMultiMessageDialog(parent=self)
+            
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                template = dialog.get_template()
+                if template:
+                    # Save the template
+                    saved_template = self.whatsapp_multi_message_manager.create_template(
+                        name=template.name,
+                        content=template.content,
+                        language=template.language,
+                        multi_message_mode=template.multi_message_mode,
+                        split_strategy=template.split_strategy,
+                        custom_delimiter=template.custom_split_delimiter,
+                        message_delay=template.message_delay_seconds,
+                        max_messages=template.max_messages_per_sequence
+                    )
+                    
+                    QMessageBox.information(
+                        self,
+                        tr("success"),
+                        tr("whatsapp_template_created", name=saved_template.name)
+                    )
+                    
+        except Exception as e:
+            logger.error(f"Failed to create WhatsApp multi-message template: {e}")
+            QMessageBox.critical(
+                self,
+                tr("error"),
+                tr("failed_to_create_whatsapp_template", error=str(e))
+            )
+    
+    def manage_whatsapp_multi_message_templates(self):
+        """Open WhatsApp multi-message template management dialog."""
+        try:
+            from .whatsapp_template_manager_dialog import WhatsAppTemplateManagerDialog
+            
+            dialog = WhatsAppTemplateManagerDialog(
+                self.whatsapp_multi_message_manager,
+                parent=self
+            )
+            dialog.exec()
+            
+        except ImportError:
+            # Fallback to simple list dialog if manager dialog not implemented yet
+            self._show_whatsapp_templates_list()
+            
+        except Exception as e:
+            logger.error(f"Failed to open WhatsApp template manager: {e}")
+            QMessageBox.critical(
+                self,
+                tr("error"),
+                tr("failed_to_open_whatsapp_manager", error=str(e))
+            )
+    
+    def _show_whatsapp_templates_list(self):
+        """Show a simple list of WhatsApp templates (fallback)."""
+        templates = self.whatsapp_multi_message_manager.get_all_templates()
+        
+        if not templates:
+            QMessageBox.information(
+                self,
+                tr("no_templates"),
+                tr("no_whatsapp_templates_found")
+            )
+            return
+        
+        # Create simple selection dialog
+        from PySide6.QtWidgets import QListWidget, QVBoxLayout, QPushButton, QHBoxLayout
+        
+        dialog = QDialog(self)
+        dialog.setWindowTitle(tr("whatsapp_multi_message_templates"))
+        dialog.resize(600, 400)
+        
+        layout = QVBoxLayout(dialog)
+        
+        template_list = QListWidget()
+        for template in templates:
+            mode_text = tr("multi_message_mode") if template.multi_message_mode else tr("single_message_mode")
+            item_text = f"{template.name} ({mode_text}) - {len(template.message_sequence) if template.multi_message_mode else 1} {tr('messages')}"
+            template_list.addItem(item_text)
+        
+        layout.addWidget(template_list)
+        
+        button_layout = QHBoxLayout()
+        
+        edit_btn = QPushButton(tr("edit_template"))
+        edit_btn.clicked.connect(lambda: self._edit_selected_whatsapp_template(template_list, templates, dialog))
+        button_layout.addWidget(edit_btn)
+        
+        delete_btn = QPushButton(tr("delete_template"))
+        delete_btn.clicked.connect(lambda: self._delete_selected_whatsapp_template(template_list, templates))
+        button_layout.addWidget(delete_btn)
+        
+        button_layout.addStretch()
+        
+        close_btn = QPushButton(tr("close"))
+        close_btn.clicked.connect(dialog.accept)
+        button_layout.addWidget(close_btn)
+        
+        layout.addLayout(button_layout)
+        
+        dialog.exec()
+    
+    def _edit_selected_whatsapp_template(self, template_list, templates, parent_dialog):
+        """Edit the selected WhatsApp template."""
+        current_row = template_list.currentRow()
+        if current_row < 0 or current_row >= len(templates):
+            return
+        
+        template = templates[current_row]
+        
+        dialog = WhatsAppMultiMessageDialog(template=template, parent=self)
+        
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            updated_template = dialog.get_template()
+            if updated_template:
+                try:
+                    self.whatsapp_multi_message_manager.update_template(
+                        template.id,
+                        name=updated_template.name,
+                        content=updated_template.content,
+                        language=updated_template.language,
+                        multi_message_mode=updated_template.multi_message_mode,
+                        split_strategy=updated_template.split_strategy,
+                        custom_delimiter=updated_template.custom_split_delimiter,
+                        message_delay=updated_template.message_delay_seconds,
+                        max_messages=updated_template.max_messages_per_sequence,
+                        message_sequence=updated_template.message_sequence
+                    )
+                    
+                    QMessageBox.information(
+                        self,
+                        tr("success"),
+                        tr("whatsapp_template_updated", name=updated_template.name)
+                    )
+                    
+                    parent_dialog.accept()  # Close the list dialog
+                    self.manage_whatsapp_multi_message_templates()  # Reopen to refresh
+                    
+                except Exception as e:
+                    logger.error(f"Failed to update WhatsApp template: {e}")
+                    QMessageBox.critical(
+                        self,
+                        tr("error"),
+                        tr("failed_to_update_whatsapp_template", error=str(e))
+                    )
+    
+    def _delete_selected_whatsapp_template(self, template_list, templates):
+        """Delete the selected WhatsApp template."""
+        current_row = template_list.currentRow()
+        if current_row < 0 or current_row >= len(templates):
+            return
+        
+        template = templates[current_row]
+        
+        reply = QMessageBox.question(
+            self,
+            tr("delete_template"),
+            tr("delete_whatsapp_template_confirm", name=template.name),
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            try:
+                self.whatsapp_multi_message_manager.delete_template(template.id)
+                
+                QMessageBox.information(
+                    self,
+                    tr("success"),
+                    tr("whatsapp_template_deleted", name=template.name)
+                )
+                
+                # Refresh the list
+                template_list.takeItem(current_row)
+                
+            except Exception as e:
+                logger.error(f"Failed to delete WhatsApp template: {e}")
+                QMessageBox.critical(
+                    self,
+                    tr("error"),
+                    tr("failed_to_delete_whatsapp_template", error=str(e))
                 )
 
     def import_csv(self):
