@@ -7,11 +7,11 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from enum import Enum
 from PySide6.QtWidgets import (
-    QToolBar, QAction, QWidget, QMainWindow, QMenu, QMenuBar,
-    QPushButton, QLabel, QComboBox, QSeparator, QFrame
+    QToolBar, QWidget, QMainWindow, QMenu, QMenuBar,
+    QPushButton, QLabel, QComboBox, QFrame, QSizePolicy
 )
 from PySide6.QtCore import QObject, Signal, Qt
-from PySide6.QtGui import QIcon, QKeySequence
+from PySide6.QtGui import QIcon, QKeySequence, QAction
 
 from ..core.user_preferences import ToolbarPosition
 from ..utils.logger import get_logger
@@ -355,7 +355,7 @@ class ToolbarManager(QObject):
             
         elif item.item_type == ToolbarItemType.SPACER:
             spacer = QWidget()
-            spacer.setSizePolicy(spacer.sizePolicy().Expanding, spacer.sizePolicy().Preferred)
+            spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
             toolbar.addWidget(spacer)
             
         elif item.item_type == ToolbarItemType.WIDGET:
