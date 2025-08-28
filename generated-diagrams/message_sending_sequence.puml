@@ -1,0 +1,54 @@
+@startuml Message Sending Workflow
+!theme plain
+title CSC-Reach - Message Sending Sequence
+
+actor "Marketing Manager" as User
+participant "MainWindow" as GUI
+participant "CSVProcessor" as Processor
+participant "TemplateManager" as Templates
+participant "VariableManager" as Variables
+participant "EmailService" as Email
+participant "OutlookService" as Outlook
+participant "MessageLogger" as Logger
+
+== Data Import Phase ==
+User -> GUI: Import customer data file
+GUI -> Processor: process_file(file_path)
+Processor -> Processor: detect_format()
+Processor -> Processor: detect_encoding()
+Processor -> Processor: validate_data()
+Processor -> GUI: return customer_list
+
+== Template Selection Phase ==
+User -> GUI: Select template
+GUI -> Templates: get_template(template_id)
+Templates -> GUI: return template
+
+== Message Preparation Phase ==
+User -> GUI: Start sending campaign
+GUI -> Variables: substitute_variables(template, customers)
+Variables -> Variables: replace {name}, {company}, etc.
+Variables -> GUI: return personalized_messages
+
+== Message Sending Phase ==
+loop for each customer
+    GUI -> Email: send_message(customer, message)
+    Email -> Outlook: create_and_send_email()
+    
+    alt Success
+        Outlook -> Email: success_response
+        Email -> Logger: log_message_sent(customer, "success")
+        Email -> GUI: update_progress(success)
+    else Failure
+        Outlook -> Email: error_response
+        Email -> Logger: log_message_sent(customer, "failed")
+        Email -> GUI: update_progress(failure)
+    end
+end
+
+== Completion Phase ==
+GUI -> Logger: generate_campaign_report()
+Logger -> GUI: return analytics_data
+GUI -> User: Display completion summary
+
+@enduml

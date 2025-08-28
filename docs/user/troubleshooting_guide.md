@@ -1,221 +1,217 @@
-# CSC-Reach Troubleshooting Guide
+# Troubleshooting Guide
 
-## 🔧 Common Problems and Solutions
+## Installation Issues
 
-### 🚫 Installation Problems
-
-#### Windows: "Windows protected your PC" message
-**What it means**: Windows doesn't recognize CSC-Reach yet  
+### Windows Security Warning
+**Issue**: "Windows protected your PC" message  
+**Cause**: Unsigned application  
 **Solution**:
-1. Click **"More info"**
-2. Click **"Run anyway"**
-3. This only happens the first time
+1. Click **More info**
+2. Click **Run anyway**
+3. This only appears on first run
 
-#### Mac: "Can't be opened because it's from an unidentified developer"
-**What it means**: macOS security is protecting you  
+### macOS Security Block
+**Issue**: "Cannot be opened because it's from an unidentified developer"  
+**Cause**: macOS Gatekeeper protection  
 **Solution**:
-1. Right-click on CSC-Reach in Applications
-2. Select **"Open"**
-3. Click **"Open"** in the dialog
-4. This only happens the first time
+1. Right-click CSC-Reach in Applications
+2. Select **Open**
+3. Click **Open** in dialog
+4. Grant permissions when prompted
 
-#### "Microsoft Outlook is not installed"
-**What it means**: CSC-Reach can't find Outlook  
+### Missing Outlook
+**Issue**: "Microsoft Outlook is not installed"  
+**Cause**: Outlook not found or not configured  
 **Solution**:
-1. Install Microsoft Outlook (from Office or Mac App Store)
-2. Set up your email account in Outlook
-3. Restart CSC-Reach
+1. Install Microsoft Outlook
+2. Configure email account
+3. Test sending email manually
+4. Restart CSC-Reach
 
----
+## Email Integration Issues
 
-### 📧 Email Problems
-
-#### "Email: Not ready" status
-**What it means**: CSC-Reach can't connect to Outlook  
+### Outlook Connection Failed
+**Issue**: "Email: Not ready" status  
+**Symptoms**: Cannot send emails, connection errors  
 **Solutions**:
-1. **Make sure Outlook is open** and working
-2. **Send a test email** from Outlook to verify it works
-3. **Restart both Outlook and CSC-Reach**
-4. **Check your internet connection**
+1. **Verify Outlook is running** and responsive
+2. **Test manual email** from Outlook
+3. **Check internet connection**
+4. **Restart both applications**
+5. **Update Outlook** to latest version
 
-#### "Failed to send email" errors
-**What it means**: Some emails couldn't be sent  
-**Solutions**:
-1. **Check email addresses** - remove invalid ones
-2. **Send fewer emails at once** - try 10-20 instead of 100+
-3. **Wait and try again** - you might have hit daily limits
-4. **Check internet connection**
-
-#### Emails are not personalized
-**What it means**: {name} and {company} aren't being replaced  
-**Solutions**:
-1. **Check your CSV file** has columns named exactly: `name`, `company`, `phone`, `email`
-2. **Use curly braces**: `{name}` not `(name)` or `[name]`
-3. **Re-import your CSV file**
-
----
-
-### 📊 Customer List Problems
-
-#### "No recipients loaded"
-**What it means**: You haven't imported customers yet  
+### macOS Automation Permissions
+**Issue**: "Not authorized to send Apple events"  
+**Cause**: Missing automation permissions  
 **Solution**:
-1. Click **"Import CSV"**
-2. Select your customer file
-3. Make sure it's in CSV format
+1. Open **System Preferences**
+2. Go to **Security & Privacy** → **Privacy**
+3. Select **Automation**
+4. Find CSC-Reach
+5. Check **Microsoft Outlook**
+6. Restart CSC-Reach
 
-#### CSV file won't import
-**What it means**: The file format is wrong  
+### Email Sending Failures
+**Issue**: Some emails fail to send  
+**Causes**: Invalid addresses, rate limits, network issues  
 **Solutions**:
-1. **Save as CSV format** in Excel:
-   - File → Save As → CSV (Comma delimited)
-2. **Check column names** are exactly: `name`, `company`, `phone`, `email`
-3. **Remove empty rows** at the top or bottom
-4. **Use English characters** - avoid special symbols in column names
+1. **Validate email addresses** - remove invalid ones
+2. **Reduce batch size** - send 10-20 at a time
+3. **Check rate limits** - wait between batches
+4. **Verify internet connection**
+5. **Review Outlook sent items**
 
-#### Customer names look wrong
-**What it means**: Character encoding problem  
-**Solutions**:
-1. **Open CSV in Notepad** (Windows) or TextEdit (Mac)
-2. **Save with UTF-8 encoding**
-3. **Re-import the file**
+## Data Import Issues
 
----
-
-### 🎯 Template Problems
-
-#### Templates don't save
-**What it means**: Permission or storage problem  
-**Solutions**:
-1. **Run CSC-Reach as administrator** (Windows)
-2. **Check available disk space** - need at least 100MB free
-3. **Try a shorter template name**
-
-#### Can't find saved templates
-**What it means**: Templates are saved but not showing  
-**Solutions**:
-1. **Restart CSC-Reach**
-2. **Check the correct category** in Template Library
-3. **Use the search box** in Template Library
-
-#### Template preview shows errors
-**What it means**: Problem with template format  
-**Solutions**:
-1. **Check for unmatched braces**: use `{name}` not `{name`
-2. **Remove special characters** from template
-3. **Keep templates under 10,000 characters**
-
----
-
-### 🐌 Performance Problems
-
-#### CSC-Reach is very slow
-**What it means**: Computer resources are low  
-**Solutions**:
-1. **Close other programs** to free memory
-2. **Send fewer emails at once** (try 25-50 instead of 200+)
-3. **Restart your computer**
-4. **Check available disk space**
-
-#### Sending emails takes forever
-**What it means**: Network or Outlook performance issue  
-**Solutions**:
-1. **Check internet speed** - slow connection = slow sending
-2. **Close other programs** using internet
-3. **Send in smaller batches** (20-30 emails at a time)
-4. **Wait for Outlook to finish** processing previous emails
-
----
-
-### 🔒 Permission Problems
-
-#### "Access denied" errors
-**What it means**: CSC-Reach doesn't have necessary permissions  
-**Solutions**:
-
-**Windows**:
-1. Right-click CSC-Reach icon
-2. Select **"Run as administrator"**
-3. Click **"Yes"** when prompted
-
-**Mac**:
-1. Go to System Preferences → Security & Privacy
-2. Click **"Privacy"** tab
-3. Find CSC-Reach and **check the box** next to it
-
-#### Antivirus blocks CSC-Reach
-**What it means**: Security software thinks CSC-Reach is suspicious  
-**Solutions**:
-1. **Add CSC-Reach to exceptions** in your antivirus
-2. **Temporarily disable** antivirus during installation
-3. **Download from official source** only
-
----
-
-### 🌐 Language Problems
-
-#### Interface is in wrong language
-**What it means**: Language setting needs to be changed  
+### File Format Not Supported
+**Issue**: "Cannot read file" error  
+**Cause**: Unsupported format or corrupted file  
 **Solution**:
-1. Look for **"Settings"** or **"Configurações"** or **"Configuraciones"**
-2. Find **"Language"** or **"Idioma"**
-3. Select your preferred language
-4. **Restart CSC-Reach**
+1. **Verify file format**: CSV, Excel (.xlsx/.xls), JSON
+2. **Check file integrity** - open in Excel/text editor
+3. **Save as CSV** if using Excel
+4. **Use UTF-8 encoding** for special characters
 
-#### Some text still in English
-**What it means**: Not all features are translated yet  
+### Column Mapping Problems
+**Issue**: Data not importing correctly  
+**Cause**: Column headers don't match expected format  
 **Solution**:
-- This is normal - core features are translated
-- Updates will include more translations
+1. **Check required columns**: name, company, email, phone
+2. **Use exact column names** (case-sensitive)
+3. **Remove extra spaces** in headers
+4. **Use column mapping dialog** to adjust
 
----
+### Encoding Issues
+**Issue**: Special characters appear as symbols  
+**Cause**: File encoding mismatch  
+**Solution**:
+1. **Save file as UTF-8** in Excel or text editor
+2. **Use "Save As" → "CSV UTF-8"** in Excel
+3. **Check character encoding** in import dialog
 
-## 🆘 Emergency Solutions
+## Template Issues
 
-### If Nothing Works
-1. **Restart your computer**
-2. **Reinstall CSC-Reach** (download fresh copy)
-3. **Check Windows/macOS updates**
-4. **Contact support** with error details
+### Variables Not Working
+**Issue**: `{name}` appears literally in messages  
+**Cause**: Incorrect variable syntax or missing data  
+**Solution**:
+1. **Use exact syntax**: `{name}` not `{Name}` or `{NAME}`
+2. **Verify data contains** required fields
+3. **Check template preview** before sending
+4. **Test with sample data**
+
+### Template Not Saving
+**Issue**: Changes lost when closing template editor  
+**Cause**: Save operation failed  
+**Solution**:
+1. **Click Save button** explicitly
+2. **Check disk space** availability
+3. **Verify write permissions** to config directory
+4. **Try different template name**
+
+## WhatsApp Issues
+
+### Cannot Connect to WhatsApp Web
+**Issue**: Browser fails to load WhatsApp Web  
+**Cause**: Network issues, browser problems  
+**Solution**:
+1. **Check internet connection**
+2. **Update browser** to latest version
+3. **Clear browser cache** and cookies
+4. **Disable browser extensions**
+5. **Try different browser**
+
+### QR Code Login Problems
+**Issue**: Cannot scan QR code or login fails  
+**Cause**: Session expired, phone not connected  
+**Solution**:
+1. **Ensure phone has internet** connection
+2. **Open WhatsApp on phone**
+3. **Scan QR code quickly** before expiration
+4. **Keep phone nearby** during session
+5. **Refresh browser** if QR code expires
+
+### Message Sending Failures
+**Issue**: WhatsApp messages fail to send  
+**Cause**: Rate limiting, connection issues, invalid numbers  
+**Solution**:
+1. **Verify phone numbers** are valid WhatsApp numbers
+2. **Send slower** - reduce sending speed
+3. **Check WhatsApp Web** is still logged in
+4. **Restart browser session**
+
+## Performance Issues
+
+### Slow File Processing
+**Issue**: Large files take too long to import  
+**Cause**: File size, system resources  
+**Solution**:
+1. **Split large files** into smaller batches
+2. **Close other applications** to free memory
+3. **Use SSD storage** for better I/O performance
+4. **Increase virtual memory** if needed
+
+### Application Freezing
+**Issue**: CSC-Reach becomes unresponsive  
+**Cause**: Heavy processing, memory issues  
+**Solution**:
+1. **Wait for operation** to complete
+2. **Check system resources** (Task Manager/Activity Monitor)
+3. **Restart application** if necessary
+4. **Process smaller batches**
+
+## Configuration Issues
+
+### Settings Not Saving
+**Issue**: Preferences reset after restart  
+**Cause**: Permission issues, corrupted config  
+**Solution**:
+1. **Run as administrator** (Windows)
+2. **Check config directory** permissions
+3. **Reset configuration** to defaults
+4. **Reinstall application** if necessary
+
+### Language Not Changing
+**Issue**: Interface remains in wrong language  
+**Cause**: Translation files missing, cache issues  
+**Solution**:
+1. **Restart application** after language change
+2. **Clear application cache**
+3. **Reinstall language pack**
+4. **Check system locale** settings
+
+## Getting Help
+
+### Diagnostic Information
+When reporting issues, include:
+- **Application version**
+- **Operating system** and version
+- **Error messages** (exact text)
+- **Steps to reproduce** the problem
+- **Log files** (if requested)
+
+### Log Files Location
+- **Windows**: `%APPDATA%\CSC-Reach\logs\`
+- **macOS**: `~/Library/Application Support/CSC-Reach/logs/`
+
+### Debug Mode
+Enable detailed logging:
+```bash
+# macOS/Linux
+export CSC_REACH_DEBUG=1
+
+# Windows
+set CSC_REACH_DEBUG=1
+```
+
+### Support Channels
+1. **Built-in Help** - Press F1 in application
+2. **User Manual** - Complete documentation
+3. **Community Forum** - User discussions
+4. **Technical Support** - For complex issues
 
 ### Before Contacting Support
-Gather this information:
-- **What you were trying to do**
-- **Exact error message** (take a screenshot)
-- **Your operating system** (Windows 10, macOS Big Sur, etc.)
-- **How many customers** you were trying to email
-- **Size of your CSV file**
-
-### Quick Diagnostic Steps
-1. **Can you open CSC-Reach?** → If no, reinstall
-2. **Can you import CSV?** → If no, check file format
-3. **Can you see "Email: Ready"?** → If no, check Outlook
-4. **Can you send one test email?** → If no, check internet
-5. **Can you send to multiple customers?** → If no, reduce batch size
-
----
-
-## 📞 Getting More Help
-
-### Self-Help Resources
-- [User Manual](user_manual.md) - Complete guide
-- [Quick Start Guide](quick_start_guide.md) - 5-minute setup
-- [Installation Guides](windows_installation_guide.md) - Step-by-step installation
-
-### Contact Support
-When contacting support, include:
-- **Screenshot of the error**
-- **Your CSV file** (remove sensitive data first)
-- **Steps you tried** from this guide
-- **Your computer details** (Windows/Mac version)
-
-### Prevention Tips
-- **Keep CSC-Reach updated** - download new versions when available
-- **Backup your templates** - export them regularly
-- **Test with small groups** - always start with 5-10 customers
-- **Keep Outlook updated** - install Microsoft Office updates
-- **Maintain your CSV file** - remove old/invalid email addresses
-
----
-
-**Still having problems?** Contact your administrator or CSC-Reach support team with the information above.
+1. **Check this guide** for common solutions
+2. **Try basic troubleshooting** steps
+3. **Gather diagnostic information**
+4. **Test with minimal data** to isolate issue

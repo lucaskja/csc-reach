@@ -1,269 +1,345 @@
-# CSC-Reach Developer Guide
+# Developer Guide
 
-## Project Structure
+## Project Overview
 
-```
-sbai-dg-wpp/                           # Clean root with only essentials
-├── README.md                          # Main project documentation
-├── LICENSE                            # License file
-├── pyproject.toml                     # Modern Python packaging
-├── .gitignore                         # Git ignore rules
-├── Makefile                           # Build automation
-├── 
-├── src/                               # Source code
-│   └── multichannel_messaging/        # Main package
-│       ├── __init__.py
-│       ├── main.py
-│       ├── core/                      # Business logic
-│       ├── gui/                       # User interface
-│       ├── services/                  # External integrations
-│       ├── utils/                     # Utilities
-│       └── localization/              # Translations
-│
-├── tests/                             # All tests
-│   ├── unit/                          # Unit tests
-│   ├── integration/                   # Integration tests
-│   └── fixtures/                      # Test data
-│
-├── docs/                              # All documentation
-│   ├── user/                          # User guides
-│   ├── dev/                           # Developer docs
-│   ├── api/                           # API documentation
-│   └── summaries/                     # Implementation summaries
-│
-├── scripts/                           # Build and utility scripts
-│   ├── build/                         # Build scripts
-│   ├── dev/                           # Development utilities
-│   └── deploy/                        # Deployment scripts
-│
-├── assets/                            # Static resources
-│   ├── icons/
-│   └── templates/
-│
-├── config/                            # Configuration files
-│   └── default_config.yaml
-│
-└── build/                             # Build outputs (gitignored)
-    ├── dist/                          # Distribution files
-    ├── temp/                          # Temporary build files
-    └── logs/                          # Build logs
-```
+CSC-Reach is a cross-platform desktop application built with Python and PySide6, designed for multi-channel bulk messaging through Microsoft Outlook and WhatsApp Web integration.
+
+## Architecture
+
+### Design Patterns
+- **MVC Architecture**: Clear separation of concerns
+- **Strategy Pattern**: Platform-specific implementations
+- **Observer Pattern**: Event-driven communication
+- **Factory Pattern**: Dynamic component creation
+- **Singleton Pattern**: Global resource management
+
+### Core Components
+- **Application Manager**: Lifecycle and coordination
+- **Configuration Manager**: Settings and persistence
+- **Template Manager**: Message template CRUD
+- **Data Processor**: Multi-format file processing
+- **Service Layer**: External integrations
+- **GUI Layer**: User interface components
 
 ## Development Setup
 
 ### Prerequisites
 - Python 3.8+
 - Git
-- Microsoft Outlook (for testing)
+- Virtual environment tool
+- Platform-specific dependencies:
+  - **Windows**: Visual Studio Build Tools
+  - **macOS**: Xcode Command Line Tools
 
-### Setup Steps
+### Environment Setup
+```bash
+# Clone repository
+git clone <repository-url>
+cd sbai-dg-wpp
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd sbai-dg-wpp
-   ```
+# Create virtual environment
+python -m venv venv
 
-2. **Create virtual environment**
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # macOS/Linux
-   # or
-   venv\Scripts\activate     # Windows
-   ```
+# Activate environment
+# Windows:
+venv\Scripts\activate
+# macOS/Linux:
+source venv/bin/activate
 
-3. **Install dependencies**
-   ```bash
-   make install-dev
-   # or
-   pip install -e ".[dev]"
-   ```
+# Install dependencies
+pip install -e ".[dev]"
 
-4. **Run the application**
-   ```bash
-   make run
-   # or
-   python src/multichannel_messaging/main.py
-   ```
+# Verify installation
+python -m pytest tests/unit/
+```
+
+### IDE Configuration
+Recommended settings for VS Code:
+```json
+{
+    "python.defaultInterpreterPath": "./venv/bin/python",
+    "python.linting.enabled": true,
+    "python.linting.flake8Enabled": true,
+    "python.formatting.provider": "black",
+    "python.testing.pytestEnabled": true
+}
+```
+
+## Project Structure
+
+```
+src/multichannel_messaging/
+├── core/                    # Business Logic
+│   ├── application_manager.py
+│   ├── config_manager.py
+│   ├── template_manager.py
+│   ├── csv_processor.py
+│   └── message_logger.py
+├── gui/                     # User Interface
+│   ├── main_window.py
+│   ├── template_library_dialog.py
+│   └── progress_dialog.py
+├── services/                # External Integrations
+│   ├── email_service.py
+│   ├── outlook_windows.py
+│   ├── outlook_macos.py
+│   └── whatsapp_web_service.py
+├── utils/                   # Utilities
+│   ├── logger.py
+│   ├── exceptions.py
+│   └── platform_utils.py
+└── localization/           # Translations
+    ├── en.json
+    ├── pt.json
+    └── es.json
+```
 
 ## Development Workflow
 
-### Code Quality
-```bash
-# Format code
-make format
+### Code Standards
+- **PEP 8** compliance via Black formatter
+- **Type hints** for all public APIs
+- **Docstrings** for classes and methods
+- **Error handling** with custom exceptions
+- **Logging** for debugging and monitoring
 
-# Run linting
-make lint
-
-# Type checking
-make type-check
-
-# Run all quality checks
-make format lint type-check
-```
-
-### Testing
+### Testing Strategy
 ```bash
 # Run all tests
-make test
-
-# Run unit tests only
-make test-unit
-
-# Run integration tests only
-make test-integration
+pytest
 
 # Run with coverage
-make test-coverage
+pytest --cov=src/multichannel_messaging
+
+# Run specific test categories
+pytest tests/unit/           # Unit tests
+pytest tests/integration/    # Integration tests
+pytest tests/gui/           # GUI tests
+
+# Run performance tests
+pytest tests/performance/
 ```
 
-### Building
-
-#### macOS
+### Code Quality Tools
 ```bash
-# Build app
-make build-macos
+# Format code
+black src/ tests/
 
-# Create DMG installer
-make dmg
+# Check style
+flake8 src/ tests/
+
+# Type checking
+mypy src/
+
+# Security analysis
+bandit -r src/
+
+# Import sorting
+isort src/ tests/
 ```
 
-#### Windows
-```bash
-# Build executable
-make build-windows
+## Key Development Areas
+
+### Adding New File Formats
+1. Extend `CSVProcessor` class
+2. Add format detection logic
+3. Implement parser method
+4. Add validation rules
+5. Update tests
+
+Example:
+```python
+class CSVProcessor:
+    def _parse_xml(self, file_path: str) -> List[Dict]:
+        """Parse XML file format"""
+        # Implementation here
+        pass
 ```
 
-## Architecture
+### Creating New Templates
+1. Define template schema
+2. Add to template categories
+3. Implement validation
+4. Create preview functionality
+5. Add to template library
 
-### Core Components
+### Platform Integration
+For new service integrations:
+1. Create abstract base class
+2. Implement platform-specific classes
+3. Add service factory
+4. Update configuration
+5. Add comprehensive tests
 
-1. **GUI Layer** (`src/multichannel_messaging/gui/`)
-   - Main window and dialogs
-   - PySide6-based interface
-   - Cross-platform UI components
-
-2. **Business Logic** (`src/multichannel_messaging/core/`)
-   - CSV processing
-   - Configuration management
-   - Data models
-   - Internationalization
-
-3. **Services** (`src/multichannel_messaging/services/`)
-   - Outlook integration (macOS/Windows)
-   - WhatsApp Web automation
-   - External API integrations
-
-4. **Utilities** (`src/multichannel_messaging/utils/`)
-   - Logging
-   - Exception handling
-   - Platform utilities
-
-### Key Design Patterns
-
-- **MVC Architecture**: Clear separation of concerns
-- **Service Layer**: External integrations abstracted
-- **Factory Pattern**: Platform-specific service creation
-- **Observer Pattern**: Progress tracking and notifications
+### GUI Components
+When adding new dialogs:
+1. Inherit from base dialog class
+2. Implement proper signal/slot connections
+3. Add internationalization support
+4. Include accessibility features
+5. Test on both platforms
 
 ## Build System
 
-### PyInstaller Configuration
+### Development Build
+```bash
+# Run in development mode
+python src/multichannel_messaging/main.py
 
-The build system uses PyInstaller with custom spec files:
-- `scripts/build/build_macos.spec` - macOS configuration
-- `scripts/build/build_windows.spec` - Windows configuration
+# With debug logging
+CSC_REACH_DEBUG=1 python src/multichannel_messaging/main.py
+```
 
-### Build Outputs
+### Production Build
+```bash
+# Build for current platform
+python scripts/build.py
 
-All build outputs are organized in the `build/` directory:
-- `build/dist/` - Final distribution files
-- `build/temp/` - Temporary build files
-- `build/logs/` - Build logs and error reports
+# Platform-specific builds
+python scripts/build_windows.py  # Windows
+python scripts/build_macos.py    # macOS
 
-## Testing Strategy
+# Create installers
+python scripts/create_installers.py
+```
+
+### Build Configuration
+Key files:
+- `pyproject.toml` - Project metadata and dependencies
+- `scripts/build.py` - Build automation
+- `.github/workflows/` - CI/CD pipelines
+
+## Testing Guidelines
 
 ### Unit Tests
 - Test individual components in isolation
 - Mock external dependencies
-- Focus on business logic
+- Cover edge cases and error conditions
+- Maintain >80% code coverage
 
 ### Integration Tests
 - Test component interactions
-- Test with real external services (when safe)
-- End-to-end workflow testing
+- Use real data files for testing
+- Test cross-platform functionality
+- Validate end-to-end workflows
 
-### Test Data
-- Sample CSV files in `tests/fixtures/`
-- Mock configurations for testing
-- Isolated test environments
+### GUI Tests
+- Use pytest-qt for Qt testing
+- Test user interactions
+- Validate dialog behavior
+- Check accessibility features
 
-## Contributing
+## Debugging
 
-### Code Style
-- Follow PEP 8
-- Use Black for formatting
-- Type hints required
-- Comprehensive docstrings
+### Debug Mode
+Enable comprehensive logging:
+```bash
+export CSC_REACH_DEBUG=1  # macOS/Linux
+set CSC_REACH_DEBUG=1     # Windows
+```
 
-### Commit Messages
-- Use conventional commit format
-- Include scope when relevant
-- Reference issues when applicable
+### Common Debug Scenarios
+- **Outlook Integration**: Check COM/AppleScript permissions
+- **File Processing**: Validate encoding and format
+- **Template Rendering**: Verify variable substitution
+- **GUI Issues**: Check Qt event handling
 
-### Pull Request Process
-1. Create feature branch
-2. Implement changes with tests
-3. Ensure all quality checks pass
-4. Update documentation
-5. Submit pull request
+### Logging
+Structured logging with different levels:
+```python
+from multichannel_messaging.utils.logger import get_logger
+
+logger = get_logger(__name__)
+logger.info("Operation completed")
+logger.error("Failed to process file", exc_info=True)
+```
+
+## Performance Optimization
+
+### Memory Management
+- Use generators for large datasets
+- Implement proper cleanup in destructors
+- Monitor memory usage during development
+- Profile memory-intensive operations
+
+### I/O Optimization
+- Implement async file operations
+- Use streaming for large files
+- Cache frequently accessed data
+- Optimize database queries
+
+### GUI Performance
+- Use lazy loading for heavy components
+- Implement virtual lists for large datasets
+- Debounce rapid UI updates
+- Move heavy operations to background threads
+
+## Security Considerations
+
+### Data Protection
+- Validate all user inputs
+- Sanitize file paths
+- Encrypt sensitive configurations
+- Implement secure logging
+
+### Integration Security
+- Use official APIs only
+- Validate external responses
+- Implement timeout mechanisms
+- Handle authentication securely
 
 ## Deployment
 
 ### Release Process
-1. Update version in `pyproject.toml`
-2. Update CHANGELOG.md
-3. Create release builds
-4. Test on target platforms
-5. Create GitHub release
-6. Upload distribution files
+1. Update version numbers
+2. Run full test suite
+3. Build for all platforms
+4. Create release packages
+5. Update documentation
+6. Tag release in Git
 
 ### Distribution
-- macOS: `.dmg` installer
-- Windows: `.exe` executable or installer
-- Cross-platform: Python package
+- **Windows**: MSI installer or ZIP archive
+- **macOS**: DMG with app bundle
+- **Code Signing**: Required for distribution
 
-## Troubleshooting
+## Contributing
 
-### Common Development Issues
+### Pull Request Process
+1. Fork repository
+2. Create feature branch
+3. Implement changes with tests
+4. Update documentation
+5. Submit pull request
 
-1. **Import errors**
-   - Ensure virtual environment is activated
-   - Check PYTHONPATH includes src/
+### Code Review Checklist
+- [ ] Code follows style guidelines
+- [ ] Tests pass and coverage maintained
+- [ ] Documentation updated
+- [ ] No security vulnerabilities
+- [ ] Cross-platform compatibility verified
 
-2. **Build failures**
-   - Check build logs in `build/logs/`
-   - Verify all dependencies are installed
-   - Ensure PyInstaller spec files are updated
-
-3. **Test failures**
-   - Check test data in `tests/fixtures/`
-   - Verify mock configurations
-   - Ensure external services are available
-
-### Debug Mode
-```bash
-# Run with debug logging
-PYTHONPATH=src python -m multichannel_messaging.main --debug
-
-# Run tests with verbose output
-pytest -v --tb=long
-```
+### Issue Reporting
+Include:
+- Clear problem description
+- Steps to reproduce
+- Expected vs actual behavior
+- Environment details
+- Log files if applicable
 
 ## Resources
 
+### Documentation
+- [User Manual](../user/user_manual.md)
+- [API Reference](../generated-docs/API.md)
+- [Architecture Guide](../generated-docs/BACKEND.md)
+
+### External Resources
 - [PySide6 Documentation](https://doc.qt.io/qtforpython/)
-- [PyInstaller Manual](https://pyinstaller.readthedocs.io/)
 - [Python Packaging Guide](https://packaging.python.org/)
-- [Project Documentation](../README.md)
+- [Qt Best Practices](https://doc.qt.io/qt-6/qtquick-bestpractices.html)
+
+### Community
+- GitHub Issues for bug reports
+- Discussions for feature requests
+- Wiki for additional documentation

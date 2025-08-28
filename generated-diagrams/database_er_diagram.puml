@@ -1,0 +1,85 @@
+@startuml CSC-Reach Database ER Diagram
+!theme plain
+title CSC-Reach - SQLite Database Schema
+
+entity "customers" {
+  * id : INTEGER <<PK>>
+  --
+  * name : TEXT
+  * company : TEXT
+  * email : TEXT
+  * phone : TEXT
+  whatsapp_opt_in : BOOLEAN
+  preferred_channel : TEXT
+  created_at : DATETIME
+  updated_at : DATETIME
+}
+
+entity "templates" {
+  * id : TEXT <<PK>>
+  --
+  * name : TEXT
+  * category : TEXT
+  * subject : TEXT
+  * content : TEXT
+  * channel : TEXT
+  variables : TEXT
+  created_at : DATETIME
+  updated_at : DATETIME
+  usage_count : INTEGER
+}
+
+entity "campaigns" {
+  * id : TEXT <<PK>>
+  --
+  * name : TEXT
+  * template_id : TEXT <<FK>>
+  * status : TEXT
+  * total_recipients : INTEGER
+  * sent_count : INTEGER
+  * failed_count : INTEGER
+  created_at : DATETIME
+  completed_at : DATETIME
+}
+
+entity "messages" {
+  * id : TEXT <<PK>>
+  --
+  * campaign_id : TEXT <<FK>>
+  * customer_id : INTEGER <<FK>>
+  * template_id : TEXT <<FK>>
+  * channel : TEXT
+  * status : TEXT
+  * subject : TEXT
+  * content : TEXT
+  * error_message : TEXT
+  sent_at : DATETIME
+  delivered_at : DATETIME
+}
+
+entity "message_analytics" {
+  * id : INTEGER <<PK>>
+  --
+  * campaign_id : TEXT <<FK>>
+  * metric_name : TEXT
+  * metric_value : REAL
+  * tags : TEXT
+  recorded_at : DATETIME
+}
+
+entity "configuration" {
+  * key : TEXT <<PK>>
+  --
+  * value : TEXT
+  * data_type : TEXT
+  updated_at : DATETIME
+}
+
+' Relationships
+campaigns ||--o{ messages : "contains"
+customers ||--o{ messages : "receives"
+templates ||--o{ messages : "uses"
+templates ||--o{ campaigns : "defines"
+campaigns ||--o{ message_analytics : "generates"
+
+@enduml

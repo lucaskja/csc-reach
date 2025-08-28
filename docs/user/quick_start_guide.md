@@ -1,101 +1,92 @@
-# CSC-Reach Quick Start Guide
+# Quick Start Guide
 
-## 🚀 Get Started in 5 Minutes
+## Get Started in 5 Minutes
 
-### What You Need
-- ✅ CSC-Reach installed on your computer
-- ✅ Microsoft Outlook set up with your email
-- ✅ A CSV file with your customer list
+### Prerequisites
+- ✅ CSC-Reach installed
+- ✅ Microsoft Outlook configured
+- ✅ Customer data file ready
 
-### Step 1: Open CSC-Reach
-**Windows**: Double-click the desktop icon  
-**Mac**: Click CSC-Reach in Applications or Dock
+### Step 1: Launch Application
+**Windows**: Double-click desktop icon  
+**macOS**: Open from Applications folder
 
-### Step 2: Import Your Customers
-1. Click **"Import CSV"**
-2. Select your customer file
-3. Your customers appear on the left
+### Step 2: Import Customer Data
+1. Click **Import Data**
+2. Select your file (CSV, Excel, JSON)
+3. Review automatic column mapping
+4. Confirm import
 
-### Step 3: Choose an Email Template
-1. Click **"Library"** button
-2. Pick a template category
-3. Click **"Use Template"**
+### Step 3: Choose Template
+1. Click **Template Library**
+2. Browse categories or search
+3. Select template
+4. Click **Use Template**
 
-### Step 4: Personalize Your Message
-- Use **{name}** for customer names
-- Use **{company}** for company names
-- Edit the subject and content as needed
+### Step 4: Customize Message
+- Edit subject and content
+- Use variables: `{name}`, `{company}`
+- Preview with sample data
+- Save changes
 
-### Step 5: Test First
-1. Select **one customer** (check the box)
-2. Click **"Create Draft"**
-3. Check the draft in Outlook
-4. Send it manually to test
+### Step 5: Test Campaign
+1. Select 1-2 customers
+2. Click **Create Draft** (email) or **Preview** (WhatsApp)
+3. Review in Outlook or preview window
+4. Send test manually
 
-### Step 6: Send to Everyone
-1. Select all customers you want to email
-2. Click **"Send Messages"**
-3. Confirm when asked
-4. Watch the progress
+### Step 6: Execute Campaign
+1. Select target recipients
+2. Choose channel (Email/WhatsApp)
+3. Click **Send Messages**
+4. Monitor progress in real-time
 
-## 📋 Your Customer CSV File
+## Data File Format
 
-Your spreadsheet must have these exact column names:
+Your file must include these columns:
 
-| name | company | phone | email |
-|------|---------|-------|-------|
-| John Smith | ABC Corp | +1-555-0123 | john@abc.com |
-| Maria Garcia | XYZ Ltd | +1-555-0456 | maria@xyz.com |
+```csv
+name,company,email,phone
+John Smith,ABC Corp,john@abc.com,+1-555-0123
+Maria Garcia,XYZ Ltd,maria@xyz.com,+1-555-0456
+```
 
-**Save as CSV format** before importing.
-
-## ✉️ Email Template Example
+## Template Example
 
 ```
-Subject: Welcome {name}!
+Subject: Welcome to {company}, {name}!
 
 Dear {name},
 
 Thank you for your interest in our services. 
-We're excited to work with {company}!
+We're excited to work with {company}.
 
 Best regards,
 Your Team
 ```
 
-## 🎯 Pro Tips
+## Pro Tips
 
-- **Always test first** with 1-2 customers
-- **Start small** - send to 10-20 customers initially
-- **Preview your email** before sending
-- **Keep it personal** - use customer names
-- **Be professional** - you represent your business
+- **Always test first** with small batches
+- **Use meaningful variables** for personalization
+- **Preview before sending** to catch errors
+- **Monitor progress** during campaigns
+- **Keep Outlook open** while sending emails
 
-## ⚠️ Important Reminders
+## Quick Troubleshooting
 
-- **Respect email limits** - don't send too many at once
-- **Only email willing customers** - avoid spam
-- **Double-check everything** - names, emails, content
-- **Have Outlook open** while sending
+| Issue | Solution |
+|-------|----------|
+| "No data loaded" | Import your customer file first |
+| "Email not ready" | Check Outlook is open and configured |
+| "Variables not working" | Use exact syntax: `{name}` not `{Name}` |
+| "Import failed" | Verify file format and column headers |
 
-## 🆘 Quick Fixes
+## Next Steps
 
-**Problem**: "No recipients loaded"  
-**Fix**: Import your CSV file first
+- Explore [Template Library](user_manual.md#template-management)
+- Learn about [Multi-Channel Messaging](user_manual.md#multi-channel-messaging)
+- Review [Best Practices](user_manual.md#best-practices)
+- Check [Troubleshooting Guide](troubleshooting_guide.md)
 
-**Problem**: "Email: Not ready"  
-**Fix**: Make sure Outlook is open and working
-
-**Problem**: Emails look wrong  
-**Fix**: Use {name} and {company} in your template
-
-**Problem**: Some emails failed  
-**Fix**: Check email addresses are correct
-
----
-
-**Need more help?** Check the [Complete User Manual](user_manual.md)
-
-**Installation problems?** See our installation guides:
-- [Windows Installation](windows_installation_guide.md)
-- [macOS Installation](macos_installation_guide.md)
+Need help? See the complete [User Manual](user_manual.md)
