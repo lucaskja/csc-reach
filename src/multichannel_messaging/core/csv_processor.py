@@ -173,8 +173,8 @@ class AdvancedTableProcessor:
         'utf-8', 'utf-8-sig',  # UTF-8 with and without BOM
         'cp1252', 'windows-1252',  # Windows Western European
         'iso-8859-1', 'latin-1',  # Latin-1
+        'cp850', 'cp437',  # DOS code pages
         'iso-8859-15', 'latin-9',  # Latin-9 (with Euro symbol)
-        'cp850',  # DOS Western European
         'ascii'  # ASCII fallback
     ]
     
@@ -390,6 +390,16 @@ class AdvancedTableProcessor:
             encoding = result.get('encoding', 'utf-8')
             confidence = result.get('confidence', 0.0)
             
+            # Handle common chardet issues
+            if encoding and encoding.lower() in ['windows-1252', 'cp1252']:
+                # Test if it actually works
+                try:
+                    raw_data.decode(encoding)
+                except UnicodeDecodeError:
+                    # Fall back to latin-1 which is more permissive
+                    encoding = 'latin-1'
+                    confidence = max(0.7, confidence)
+            
             # Map confidence score to our confidence levels
             if confidence >= 0.9:
                 conf_level = EncodingConfidence.HIGH
@@ -404,7 +414,7 @@ class AdvancedTableProcessor:
             
         except Exception as e:
             logger.warning(f"chardet detection failed: {e}")
-            return EncodingResult('utf-8', EncodingConfidence.FALLBACK, 0.0, 'chardet_error')
+            return EncodingResult('latin-1', EncodingConfidence.FALLBACK, 0.0, 'chardet_error')
     
     def _detect_systematic(self, raw_data: bytes) -> EncodingResult:
         """Systematically test encodings in order of preference."""
@@ -425,7 +435,12 @@ class AdvancedTableProcessor:
             except (UnicodeDecodeError, UnicodeError):
                 continue
         
-        return EncodingResult('utf-8', EncodingConfidence.FALLBACK, 0.0, 'systematic_fallback')
+        # Final fallback - try latin-1 which can decode any byte sequence
+        try:
+            decoded = raw_data.decode('latin-1')
+            return EncodingResult('latin-1', EncodingConfidence.FALLBACK, 0.2, 'systematic_final')
+        except:
+            return EncodingResult('utf-8', EncodingConfidence.FALLBACK, 0.0, 'systematic_fallback')
     
     def _detect_heuristic(self, raw_data: bytes) -> EncodingResult:
         """Use content heuristics to detect encoding."""
